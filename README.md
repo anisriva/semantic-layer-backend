@@ -36,7 +36,7 @@ backend/
 │   ├── types/                          # Shared TS types/interfaces
 │   └── utils/                          # Global utility functions
 ├── tests/                              # Test suite
-├── docker-compose.yaml                 # Qdrant and external services
+├── docker-compose.yaml                 # Qdrant and external services (compatible with podman-compose)
 ├── .env.example
 ├── .env
 ├── package.json
@@ -49,7 +49,7 @@ backend/
 ### Prerequisites
 
 - Node.js (v18 or higher)
-- Docker and Docker Compose (for Qdrant)
+- Docker and Docker Compose OR Podman and podman-compose (for Qdrant and Ollama)
 
 ### Installation
 
@@ -64,10 +64,14 @@ cp .env.example .env
 # Edit .env with your configuration
 ```
 
-3. Start Qdrant (optional, for future use):
+3. Start Qdrant and Ollama (optional, for future use):
 ```bash
 docker-compose up -d
+# or
+podman-compose up -d
 ```
+
+For detailed Ollama setup instructions, including model recommendations for Apple M3 Pro (qwen2.5-coder:7b for code tasks), see [Ollama Setup Guide](../../artifacts/new/ollama-setup-guide.md).
 
 ### Running the Application
 
@@ -97,9 +101,12 @@ curl http://localhost:3000/health
 | NODE_ENV | Environment (development/production/test) | development |
 | QDRANT_URL | Qdrant vector database URL | http://localhost:6333 |
 | QDRANT_API_KEY | Qdrant API key (optional) | - |
-| OPENAI_API_KEY | OpenAI API key (for future use) | - |
-| MODEL_URL | LLM model URL (for future use) | http://localhost:11434 |
-| MODEL_NAME | LLM model name (for future use) | - |
+| LLM_API_KEY | LLM API key (optional, for OpenAI etc.) | - |
+| LLM_BASE_URL | LLM base URL (OpenAI-compatible) | http://localhost:11434 |
+| LLM_MODEL | LLM model name | - |
+| EMBEDDING_API_KEY | Embedding API key (optional) | - |
+| EMBEDDING_BASE_URL | Embedding base URL (OpenAI-compatible) | http://localhost:11434 |
+| EMBEDDING_MODEL | Embedding model name | - |
 
 ## Development
 

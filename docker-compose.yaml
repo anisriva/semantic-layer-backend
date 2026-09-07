@@ -13,5 +13,20 @@ services:
       - QDRANT__SERVICE__GRPC_PORT=6334
       - QDRANT__LOG_LEVEL=DEBUG
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: semantic-code-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+      - OLLAMA_NUM_THREAD=8
+      - OLLAMA_MAX_LOADED_MODELS=2
+      - OLLAMA_GPU_LAYERS=35
+    restart: unless-stopped
+
 volumes:
   qdrant_data:
+  ollama_data:
