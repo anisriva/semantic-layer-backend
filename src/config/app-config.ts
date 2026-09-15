@@ -69,7 +69,9 @@ export function getFullAppConfig(forceReload = false): FullAppConfig {
     ragPipeline: {
       ingestion: {
         maxTokensPerChunk: getConfigValue('ragPipeline.ingestion.maxTokensPerChunk', 512) as number,
-        excludePatterns: getConfigValue('ragPipeline.ingestion.excludePatterns', ['node_modules', 'dist', '.git', 'coverage']) as string[],
+        excludePatterns: getConfigValue('ragPipeline.ingestion.excludePatterns', [
+          '(^|/)node_modules(/|$)', '(^|/)dist(/|$)', '(^|/)\\.git(/|$)', '(^|/)coverage(/|$)',
+        ]) as string[],
       },
       retrieval: {
         topK: getConfigValue('ragPipeline.retrieval.topK', 10) as number,
