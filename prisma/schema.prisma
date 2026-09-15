@@ -1,0 +1,198 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  REGULAR
+  ADMIN
+}
+
+enum RepositoryStatus {
+  NOT_READY
+  READY
+  ERROR
+}
+
+enum RepositoryPermission {
+  READ
+  READ_WRITE
+}
+
+enum AccessRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum JobType {
+  INDEX
+  REFRESH
+}
+
+enum JobStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
+enum AuditStatus {
+  started
+  completed
+  failed
+}
+
+enum MessageRole {
+  user
+  assistant
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  name          String
+  role          UserRole @default(REGULAR)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  owned_repositories Repository[]     @relation("RepositoryOwner")
+  repository_access RepositoryAccess[]
+  conversations     Conversation[]
+  access_requests   AccessRequest[]
+
+  @@index([email])
+  @@index([role])
+}
+
+model Repository {
+  id              String           @id @default(uuid())
+  git_url         String           @unique
+  name            String
+  description     String?
+  status          RepositoryStatus @default(NOT_READY)
+  last_processed_job_id String?
+  owner_id        String
+  created_at      DateTime         @default(now())
+  updated_at      DateTime         @updatedAt
+
+  owner              User   @relation("RepositoryOwner", fields: [owner_id], references: [id])
+  last_processed_job Job?   @relation("RepositoryLastProcessedJob", fields: [last_processed_job_id], references: [id], onDelete: SetNull)
+  jobs               Job[]  @relation("RepositoryJobs")
+  conversations     Conversation[]
+  repository_access RepositoryAccess[]
+  access_requests   AccessRequest[]
+
+  @@index([status])
+  @@index([git_url])
+  @@index([owner_id])
+  @@index([last_processed_job_id])
+}
+
+model RepositoryAccess {
+  id             String               @id @default(uuid())
+  repository_id  String
+  user_id        String
+  permission     RepositoryPermission
+  granted_at     DateTime             @default(now())
+  granted_by     String?
+
+  repository Repository @relation(fields: [repository_id], references: [id])
+  user       User       @relation(fields: [user_id], references: [id])
+
+  @@unique([repository_id, user_id])
+  @@index([user_id])
+  @@index([repository_id])
+}
+
+model AccessRequest {
+  id               String              @id @default(uuid())
+  repository_id    String
+  user_id          String
+  status           AccessRequestStatus @default(PENDING)
+  requested_at     DateTime            @default(now())
+  responded_at     DateTime?
+  responded_by     String?
+  response_message String?
+
+  repository Repository @relation(fields: [repository_id], references: [id])
+  user       User       @relation(fields: [user_id], references: [id])
+
+  @@index([repository_id, status])
+  @@index([user_id, status])
+}
+
+model Job {
+  id              String    @id @default(uuid())
+  repository_id   String
+  type            JobType
+  status          JobStatus @default(pending)
+  commit_head     String
+  worker_id       String?
+  error_message   String?
+  retry_count     Int       @default(0)
+  created_at      DateTime  @default(now())
+  started_at      DateTime?
+  completed_at    DateTime?
+  last_heartbeat  DateTime?
+
+  repository       Repository   @relation("RepositoryJobs", fields: [repository_id], references: [id])
+  last_processed_by Repository[] @relation("RepositoryLastProcessedJob")
+  audit_logs        AuditLog[]
+
+  @@index([status, created_at])
+  @@index([repository_id])
+  @@index([worker_id])
+}
+
+model AuditLog {
+  id              String      @id @default(uuid())
+  job_id          String
+  step            String
+  status          AuditStatus
+  metrics         Json?
+  error_message   String?
+  started_at      DateTime    @default(now())
+  completed_at    DateTime?
+
+  job Job @relation(fields: [job_id], references: [id])
+
+  @@index([job_id, step])
+  @@index([status])
+}
+
+model Conversation {
+  id              String   @id @default(uuid())
+  repository_id   String
+  user_id         String
+  title           String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  repository Repository @relation(fields: [repository_id], references: [id])
+  user       User       @relation(fields: [user_id], references: [id])
+  messages   Message[]
+
+  @@index([repository_id])
+  @@index([user_id])
+  @@index([created_at])
+}
+
+model Message {
+  id              String      @id @default(uuid())
+  conversation_id String
+  role            MessageRole
+  content         String      @db.Text
+  created_at      DateTime    @default(now())
+
+  conversation Conversation @relation(fields: [conversation_id], references: [id])
+
+  @@index([conversation_id])
+  @@index([created_at])
+}

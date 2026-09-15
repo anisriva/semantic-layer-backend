@@ -8,7 +8,13 @@
     "build": "tsc && tsc-alias",
     "start": "node dist/server.js",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:db": "npx tsx src/connectors/test/test-database-connection.ts",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "prisma:push": "prisma db push",
+    "prisma:format": "prisma format"
   },
   "keywords": [],
   "author": "",
@@ -16,11 +22,15 @@
   "type": "module",
   "dependencies": {
     "@code-rag/core": "0.1.10",
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
     "@qdrant/js-client-rest": "1.17.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "neverthrow": "^8.1.1",
     "nunjucks": "^3.2.4",
+    "pg": "^8.13.1",
+    "prisma": "^7.10.0",
     "yaml": "^2.9.1",
     "zod": "^4.5.4"
   },
