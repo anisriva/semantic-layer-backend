@@ -25,6 +25,14 @@ services:
       - OLLAMA_NUM_THREAD=8
       - OLLAMA_MAX_LOADED_MODELS=2
       - OLLAMA_GPU_LAYERS=35
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: 16G
+        reservations:
+          cpus: '4'
+          memory: 8G
     restart: unless-stopped
 
 volumes:
