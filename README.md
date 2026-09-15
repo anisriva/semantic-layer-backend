@@ -49,7 +49,7 @@ backend/
 ### Prerequisites
 
 - Node.js (v18 or higher)
-- Docker and Docker Compose OR Podman and podman-compose (for Qdrant and Ollama)
+- Podman and podman-compose (for Qdrant and Ollama)
 
 ### Installation
 
@@ -64,14 +64,18 @@ cp .env.example .env
 # Edit .env with your configuration
 ```
 
-3. Start Qdrant and Ollama (optional, for future use):
+3. Start Qdrant and Ollama:
 ```bash
-docker-compose up -d
-# or
 podman-compose up -d
 ```
 
 For detailed Ollama setup instructions, including model recommendations for Apple M3 Pro (qwen2.5-coder:7b for code tasks), see [Ollama Setup Guide](../../artifacts/new/ollama-setup-guide.md).
+
+## Semantic Core
+
+The backend is pinned to `@code-rag/core` 0.1.10. The audited local CodeRAG checkout was at commit `7c6323db6b670f02e1f555e12d757332e295a518`. Parser, chunker, Qdrant storage, BM25, and hybrid retrieval behavior is consumed directly from that package; application orchestration remains outside the core boundary.
+
+`@qdrant/js-client-rest` is pinned to 1.17.0 because CodeRAG 0.1.10 uses its `search()` API.
 
 ### Running the Application
 
@@ -123,4 +127,12 @@ curl http://localhost:3000/health
 
 ### Testing
 
-Tests should mirror the `src/` structure in the `tests/` directory.
+Tests should mirror the `src/` structure in the `tests/` directory. Integration tests use real services rather than mocks.
+
+```bash
+podman-compose up -d
+npm test
+npm run build
+```
+
+The RAG integration test parses and chunks TypeScript, generates embeddings through the configured OpenAI-compatible endpoint, persists vectors in Qdrant, and executes hybrid retrieval.

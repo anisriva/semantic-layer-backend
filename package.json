@@ -7,15 +7,19 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc && tsc-alias",
     "start": "node dist/server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@code-rag/core": "0.1.10",
+    "@qdrant/js-client-rest": "1.17.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "neverthrow": "^8.1.1",
     "zod": "^4.5.4"
   },
   "devDependencies": {
@@ -24,6 +28,7 @@
     "tsc-alias": "^1.9.4",
     "tsconfig-paths": "^4.2.0",
     "tsx": "^4.23.13",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^3.0.5"
   }
 }
