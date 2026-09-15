@@ -19,6 +19,7 @@ build/
 *.swp
 *.swo
 *~
+.helpers/
 
 # OS
 .DS_Store
