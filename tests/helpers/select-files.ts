@@ -1,4 +1,4 @@
-import { FileScanner, type ScannedFile } from '@/services/core/index.js';
+import { FileScanner, type ScannedFile } from '@/helpers/core/index.js';
 
 export async function selectFiles(
   repositoryPath: string,

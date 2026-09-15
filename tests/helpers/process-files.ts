@@ -6,7 +6,7 @@ import {
   type Chunk,
   type ParsedFile,
   type ScannedFile,
-} from '@/services/core/index.js';
+} from '@/helpers/core/index.js';
 
 export interface ProcessedFiles {
   chunks: Chunk[];

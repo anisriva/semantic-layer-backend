@@ -1,4 +1,4 @@
-import type { Chunk, LLMProvider } from '@/services/core/index.js';
+import type { Chunk, LLMProvider } from '@/helpers/core/index.js';
 import { renderPrompt } from '@/config/index.js';
 
 export async function enrichChunks(chunks: Chunk[], llm: LLMProvider): Promise<Chunk[]> {

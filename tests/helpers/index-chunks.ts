@@ -3,7 +3,7 @@ import type {
   Chunk,
   EmbeddingProvider,
   VectorStore,
-} from '@/services/core/index.js';
+} from '@/helpers/core/index.js';
 
 export async function indexChunks(
   chunks: Chunk[],

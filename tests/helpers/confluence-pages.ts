@@ -2,7 +2,7 @@ import {
   MarkdownParser,
   type Chunk,
   type ConfluencePage,
-} from '@/services/core/index.js';
+} from '@/helpers/core/index.js';
 
 export function confluencePagesToChunks(
   pages: ConfluencePage[],

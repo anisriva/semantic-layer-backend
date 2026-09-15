@@ -1,5 +1,5 @@
 import { QdrantClient } from '@qdrant/js-client-rest';
-import type { Chunk, ChunkType } from '@/services/core/index.js';
+import type { Chunk, ChunkType } from '@/helpers/core/index.js';
 
 const CHUNK_TYPES: ChunkType[] = [
   'class',

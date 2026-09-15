@@ -1,4 +1,4 @@
-import type { HybridSearch, SearchResult } from '@/services/core/index.js';
+import type { HybridSearch, SearchResult } from '@/helpers/core/index.js';
 
 export async function retrieve(
   question: string,

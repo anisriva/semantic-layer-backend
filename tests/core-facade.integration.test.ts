@@ -1,4 +1,4 @@
-import * as core from '@/services/core/index.js';
+import * as core from '@/helpers/core/index.js';
 import { getEmbeddingModelConfig, getFullAppConfig } from '@/config/index.js';
 import { describe, expect, it } from 'vitest';
 

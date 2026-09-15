@@ -4,7 +4,7 @@ import {
   MarkdownParser,
   TreeSitterParser,
   type ConfluencePage,
-} from '@/services/core/index.js';
+} from '@/helpers/core/index.js';
 import { confluencePagesToChunks } from './helpers/confluence-pages.js';
 
 describe('CodeRAG parser and chunker integration', () => {

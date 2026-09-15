@@ -1,4 +1,4 @@
-import type { SearchResult } from '@/services/core/index.js';
+import type { SearchResult } from '@/helpers/core/index.js';
 import { renderPrompt } from '@/config/index.js';
 
 export function buildContext(results: SearchResult[]): string {

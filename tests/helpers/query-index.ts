@@ -13,7 +13,7 @@ import {
   type EmbeddingProvider,
   type LLMProvider,
   type SearchResult,
-} from '@/services/core/index.js';
+} from '@/helpers/core/index.js';
 import { answerQuestion } from './answer-question.js';
 import { buildContext } from './build-context.js';
 import { loadChunks } from './load-chunks.js';

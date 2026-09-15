@@ -1,4 +1,4 @@
-import { LLMError, type LLMProvider } from '@/services/core/index.js';
+import { LLMError, type LLMProvider } from '@/helpers/core/index.js';
 import { err, ok, type Result } from 'neverthrow';
 import { renderPrompt } from '@/config/index.js';
 

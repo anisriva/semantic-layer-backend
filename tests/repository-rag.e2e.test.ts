@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { computeFileHash, type ScannedFile } from '@/services/core/index.js';
+import { computeFileHash, type ScannedFile } from '@/helpers/core/index.js';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createRagHarness } from './helpers/rag-harness.js';
 import { queryIndex } from './helpers/query-index.js';

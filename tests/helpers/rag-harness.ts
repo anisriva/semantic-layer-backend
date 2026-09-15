@@ -17,7 +17,7 @@ import {
   type LLMProvider,
   type ScannedFile,
   type SearchResult,
-} from '@/services/core/index.js';
+} from '@/helpers/core/index.js';
 import { answerQuestion } from './answer-question.js';
 import { buildContext } from './build-context.js';
 import { enrichChunks } from './enrich-chunks.js';

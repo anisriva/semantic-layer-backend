@@ -1,4 +1,4 @@
-import type { LLMProvider } from '@/services/core/index.js';
+import type { LLMProvider } from '@/helpers/core/index.js';
 import { renderPrompt } from '@/config/index.js';
 
 export async function answerQuestion(
