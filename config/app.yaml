@@ -19,11 +19,7 @@ app:
     
   appDb:
     postgres:
-      host: "localhost"
-      port: 5432
-      database: "semantic_layer"
-      user: "semantic_layer"
-      password: 
+      connectionString: ""
 
 models:
   embedding:

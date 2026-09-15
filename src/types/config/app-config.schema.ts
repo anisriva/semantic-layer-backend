@@ -24,11 +24,7 @@ export const qdrantConfigSchema = z.object({
 });
 
 export const postgresConfigSchema = z.object({
-  host: z.string(),
-  port: z.number().int().positive(),
-  database: z.string(),
-  user: z.string(),
-  password: z.string(),
+  connectionString: z.string(),
 });
 
 export const ragDbConfigSchema = z.object({

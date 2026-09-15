@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as dotenv from 'dotenv';
+import { loadAppConfig } from './yaml-loader.js';
 
 /**
  * Parse .env file with dotted key format
@@ -89,18 +90,17 @@ export function getNestedValue(obj: unknown, path: string, fallback: unknown): u
 
 /**
  * Get configuration value with precedence: .env > YAML > fallback
- * @param envPath - Path to .env file
- * @param yamlConfig - Loaded YAML configuration
  * @param path - Dot-separated path (e.g., 'app.server.port')
  * @param fallback - Ultimate fallback value
  * @returns Configuration value
  */
 export function getConfigValue(
-  envPath: string,
-  yamlConfig: unknown,
   path: string,
   fallback: unknown
 ): unknown {
+  const envPath = '.env';
+  const yamlConfig = loadAppConfig();
+  
   // Try .env file first
   const envConfig = loadEnvFile(envPath);
   const envValue = getNestedValue(envConfig, path, undefined);
