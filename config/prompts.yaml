@@ -1,0 +1,24 @@
+# Semantic Layer Prompts Configuration
+# Jinja-like templating for LLM prompts and context building
+
+enrichment:
+  chunkSummary: |
+    Summarize this {{ language }} {{ chunkType }} in one concise sentence. Focus on what it does.
+    {{ content }}
+
+answer:
+  systemPrompt: |
+    You are a helpful code assistant. Answer questions using only the provided repository context. Cite file paths when relevant.
+  userPrompt: |
+    Question: {{ question }}
+    Context:
+    {{ context }}
+
+context:
+  chunkTemplate: |
+    File: {{ filePath }}
+    Type: {{ chunkType }}
+    Title: {{ title }}
+    Tags: {{ tags }}
+    Summary: {{ summary }}
+    {{ content }}

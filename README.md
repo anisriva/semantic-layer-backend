@@ -23,6 +23,8 @@ backend/
 │   ├── app.ts                          # Express app factory
 │   ├── server.ts                       # Application entry point
 │   ├── config/                         # Configuration management
+│   │   ├── app-config.ts              # Application config loading
+│   │   ├── prompts-config.ts          # Prompts config with Nunjucks
 │   │   └── index.ts
 │   ├── connectors/                     # External interface implementations
 │   ├── constants/                      # Application constants and enums
@@ -34,7 +36,13 @@ backend/
 │   ├── routes/                         # Route definitions
 │   ├── services/                       # Business orchestrators
 │   ├── types/                          # Shared TS types/interfaces
+│   │   └── config/                     # Config type definitions
 │   └── utils/                          # Global utility functions
+│       ├── env-loader.ts               # .env file loading with dotted key support
+│       └── yaml-loader.ts              # YAML loading utilities
+├── config/                             # YAML configuration files
+│   ├── app.yaml                        # Application configuration
+│   └── prompts.yaml                    # LLM prompts
 ├── tests/                              # Test suite
 ├── docker-compose.yaml                 # Qdrant and external services (compatible with podman-compose)
 ├── .env.example
@@ -73,7 +81,7 @@ For detailed Ollama setup instructions, including model recommendations for Appl
 
 ## Semantic Core
 
-The backend is pinned to `@code-rag/core` 0.1.10. The audited local CodeRAG checkout was at commit `7c6323db6b670f02e1f555e12d757332e295a518`. Parser, chunker, Qdrant storage, BM25, and hybrid retrieval behavior is consumed directly from that package; application orchestration remains outside the core boundary.
+The backend is pinned to `@code-rag/core` 0.1.10. Parser, chunker, Qdrant storage, BM25, and hybrid retrieval behavior is consumed directly from that package; application orchestration remains outside the core boundary.
 
 `@qdrant/js-client-rest` is pinned to 1.17.0 because CodeRAG 0.1.10 uses its `search()` API.
 
@@ -97,20 +105,83 @@ Once the server is running, check the health endpoint:
 curl http://localhost:3000/health
 ```
 
-## Environment Variables
+## Configuration
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| PORT | Server port | 3000 |
-| NODE_ENV | Environment (development/production/test) | development |
-| QDRANT_URL | Qdrant vector database URL | http://localhost:6333 |
-| QDRANT_API_KEY | Qdrant API key (optional) | - |
-| LLM_API_KEY | LLM API key (optional, for OpenAI etc.) | - |
-| LLM_BASE_URL | LLM base URL (OpenAI-compatible) | http://localhost:11434 |
-| LLM_MODEL | LLM model name | - |
-| EMBEDDING_API_KEY | Embedding API key (optional) | - |
-| EMBEDDING_BASE_URL | Embedding base URL (OpenAI-compatible) | http://localhost:11434 |
-| EMBEDDING_MODEL | Embedding model name | - |
+The configuration system uses a hierarchical approach with YAML files and environment variables:
+
+### Configuration Files
+
+- `config/app.yaml` - Application configuration (app, models, rag-pipeline sections)
+- `config/prompts.yaml` - LLM prompts with Jinja-like templating
+
+### Configuration Loading Priority
+
+1. **.env file** (highest priority) - Dotted key format matching YAML hierarchy
+2. **YAML files** (fallback) - Default values in config files
+3. **Code defaults** (lowest priority) - Hardcoded fallbacks
+
+### Environment Variables
+
+The `.env` file uses dotted key format that matches the YAML hierarchy for intuitive configuration:
+
+```text
+# Server
+app.server.port=3000
+app.server.nodeEnv=development
+
+# Worker
+app.worker.pollIntervalMs=5000
+app.worker.heartbeatIntervalMs=30000
+app.worker.staleAfterMs=300000
+app.worker.maxRetries=3
+
+# RAG Database
+app.ragDb.qdrant.url=http://localhost:6333
+app.ragDb.qdrant.collectionPrefix=semantic-layer
+
+# Application Database
+app.appDb.postgres.host=localhost
+app.appDb.postgres.port=5432
+app.appDb.postgres.database=semantic_layer
+app.appDb.postgres.user=semantic_layer
+
+# Models
+models.embedding.baseUrl=http://localhost:11434/v1
+models.embedding.model=nomic-embed-text
+models.embedding.dimensions=768
+models.enrichment.baseUrl=http://localhost:11434/v1
+models.enrichment.model=qwen2.5-coder:7b-instruct
+models.enrichment.maxRetries=2
+models.enrichment.retryDelayMs=1000
+models.enrichment.timeout=120000
+models.answer.baseUrl=http://localhost:11434/v1
+models.answer.model=qwen2.5-coder:7b-instruct
+models.answer.maxRetries=2
+models.answer.retryDelayMs=1000
+models.answer.timeout=120000
+
+# RAG Pipeline
+ragPipeline.ingestion.maxTokensPerChunk=512
+ragPipeline.ingestion.excludePatterns=node_modules,dist,.git,coverage
+ragPipeline.retrieval.topK=10
+ragPipeline.retrieval.vectorWeight=0.7
+ragPipeline.retrieval.bm25Weight=0.3
+```
+
+**Role-Specific LLM Configuration:**
+- `models.enrichment.*` variables control the model used for chunk enrichment during indexing
+- `models.answer.*` variables control the model used for generating grounded answers after retrieval
+- These can be configured independently to use different providers or models for each role
+
+### Configuration Utilities
+
+- `src/utils/env-loader.ts` - Handles `.env` file parsing with dotted key support and type conversion
+- `src/utils/yaml-loader.ts` - Handles YAML file loading and parsing only
+- `getConfigValue()` - Main function that looks up values in `.env` first, then falls back to YAML
+
+### Type Safety
+
+All configuration is validated using Zod schemas with types inferred directly from the schemas (no duplicate type definitions).
 
 ## Development
 
@@ -136,3 +207,14 @@ npm run build
 ```
 
 The RAG integration test parses and chunks TypeScript, generates embeddings through the configured OpenAI-compatible endpoint, persists vectors in Qdrant, and executes hybrid retrieval.
+
+### Query-Only Verification
+
+Querying is decoupled from indexing under `tests/helpers/query-index.ts`. This helper reloads persisted Qdrant payloads, rebuilds BM25 in memory, embeds only the new question, performs hybrid retrieval, assembles source-aware context, and invokes only the answer-role LLM. This allows testing retrieval and answer generation without re-indexing repository chunks.
+
+To run query-only verification against a persisted index:
+```bash
+npx tsx tests/helpers/query-current-index.ts "Your question"
+```
+
+The persistent `semantic-layer-backend-verification` collection currently contains 101 points for verification purposes.

@@ -1,0 +1,165 @@
+# Semantic Layer Application Configuration
+# This file provides default values that are used as fallback when environment variables are not set
+
+app:
+  server:
+    port: 3000
+    nodeEnv: "development"
+
+  worker:
+    pollIntervalMs: 5000
+    heartbeatIntervalMs: 30000
+    staleAfterMs: 300000
+    maxRetries: 3
+
+  ragDb:
+    qdrant:
+      url: "http://localhost:6333"
+      collectionPrefix: "semantic-layer"
+    
+  appDb:
+    postgres:
+      host: "localhost"
+      port: 5432
+      database: "semantic_layer"
+      user: "semantic_layer"
+      password: 
+
+models:
+  embedding:
+    baseUrl: "http://localhost:11434/v1"
+    apiKey: ""
+    model: "nomic-embed-text"
+    dimensions: 768
+  enrichment:
+    baseUrl: "http://localhost:11434/v1"
+    apiKey: ""
+    model: "qwen2.5-coder:7b-instruct"
+    maxRetries: 2
+    retryDelayMs: 1000
+    timeout: 120000
+  answer:
+    baseUrl: "http://localhost:11434/v1"
+    apiKey: ""
+    model: "qwen2.5-coder:7b-instruct"
+    maxRetries: 2
+    retryDelayMs: 1000
+    timeout: 120000
+
+ragPipeline:
+  ingestion:
+    maxTokensPerChunk: 512
+    excludePatterns:
+      # General/OS
+      - ".git"
+      - ".gitignore"
+      - ".DS_Store"
+      - "Thumbs.db"
+      - "*.log"
+      - "*.tmp"
+      - "*.temp"
+      - "*.swp"
+      - "*.swo"
+      - "*~"
+
+      # Node.js/JavaScript/TypeScript
+      - "node_modules"
+      - "dist"
+      - "build"
+      - ".next"
+      - ".nuxt"
+      - ".cache"
+      - ".parcel-cache"
+      - ".turbo"
+      - "*.min.js"
+      - "*.min.js.map"
+      - "package-lock.json"
+      - "yarn.lock"
+      - "pnpm-lock.yaml"
+
+      # Python
+      - "__pycache__"
+      - "*.pyc"
+      - "*.pyo"
+      - "*.pyd"
+      - ".Python"
+      - "*.so"
+      - ".pytest_cache"
+      - ".mypy_cache"
+      - ".tox"
+      - ".venv"
+      - "venv"
+      - "env"
+      - "*.egg-info"
+      - ".eggs"
+      - "pipenv"
+      - "Pipfile.lock"
+      - "poetry.lock"
+      - "*.whl"
+
+      # Java
+      - "target"
+      - "*.class"
+      - "*.jar"
+      - "*.war"
+      - "*.ear"
+      - ".gradle"
+      - ".mvn"
+      - "mvnw"
+      - "mvnw.cmd"
+      - "gradlew"
+      - "gradlew.bat"
+
+      # Kotlin
+      - "target"
+      - "build"
+      - "*.class"
+      - "*.jar"
+      - "*.war"
+      - "*.kotlin_module"
+      - ".gradle"
+      - ".mvn"
+
+      # Go
+      - "vendor"
+      - "*.exe"
+      - "*.exe~"
+      - "*.dll"
+      - "*.so"
+      - "*.dylib"
+      - "*.test"
+      - "*.out"
+      - "go.sum"
+      - "bin"
+      - "pkg"
+
+      # Scala
+      - "target"
+      - "project/target"
+      - "project/project"
+      - "*.class"
+
+      # Testing/Coverage
+      - "coverage"
+      - ".coverage"
+      - "*.cover"
+      - ".nyc_output"
+      - "test-results"
+      - ".pytest_cache"
+      - ".jest"
+      - ".mocha"
+
+      # IDE/Editor
+      - ".idea"
+      - ".vscode"
+      - "*.sublime-project"
+      - "*.sublime-workspace"
+      - ".eclipse"
+      - ".settings"
+      - ".project"
+      - ".classpath"
+      - ".helpers"
+  retrieval:
+    topK: 10
+    vectorWeight: 0.7
+    bm25Weight: 0.3

@@ -1,15 +1,15 @@
 import http from 'http';
-import config from '@/config/index.js';
+import { getFullAppConfig } from '@/config/index.js';
 import { createApp } from '@/app.js';
 
+const fullConfig = getFullAppConfig();
 const app = createApp();
 const server = http.createServer(app);
 
 // Start the server
-server.listen(config.port, () => {
-  console.log(`🚀 Server running on port ${config.port}`);
-  console.log(`📊 Environment: ${config.nodeEnv}`);
-  console.log(`🔗 Health check: http://localhost:${config.port}/health`);
+server.listen(fullConfig.app.server.port, () => {
+  console.log(`🚀 Server running on port ${fullConfig.app.server.port}`);
+  console.log(`🔗 Health check: http://localhost:${fullConfig.app.server.port}/health`);
 });
 
 // Graceful shutdown

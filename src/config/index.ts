@@ -1,37 +1,46 @@
-import dotenv from 'dotenv';
-import { z } from 'zod';
+/**
+ * Main configuration export
+ * Aggregates all configuration modules
+ */
 
-// Load environment variables
-dotenv.config();
+// Application configuration
+export { 
+  validateAppConfig, 
+  getFullAppConfig,
+  getServerConfig,
+  getModelsConfig,
+  getRagPipelineConfig,
+  getEmbeddingModelConfig,
+  getEnrichmentModelConfig,
+  getAnswerModelConfig,
+  getIngestionConfig,
+  getRetrievalConfig,
+  getWorkerConfig,
+  getQdrantConfig,
+  getPostgresConfig,
+} from './app-config.js';
 
-// Define the configuration schema
-const configSchema = z.object({
-  // Server Configuration
-  port: z.coerce.number().default(3000),
-  nodeEnv: z.enum(['development', 'production', 'test']).default('development'),
+// Prompts configuration
+export { renderTemplate, getPromptsConfig, renderPrompt } from './prompts-config.js';
 
-  // Qdrant Configuration
-  qdrantUrl: z.string().url().default('http://localhost:6333'),
-  qdrantApiKey: z.string().optional(),
+// Types (inferred from Zod schemas)
+export type { 
+  FullAppConfig, 
+  AppConfig, 
+  ModelsConfig, 
+  RagPipelineConfig,
+  EmbeddingModelConfig,
+  LlmModelConfig,
+  IngestionConfig, 
+  RetrievalConfig, 
+  WorkerConfig,
+  QdrantConfig,
+  PostgresConfig
+} from '@/types/config/app-config.schema.js';
 
-  // LLM Configuration (for future use)
-  openaiApiKey: z.string().optional(),
-  modelUrl: z.string().url().or(z.literal('')).optional(),
-  modelName: z.string().optional(),
-});
-
-// Parse and validate environment variables
-const envVars = {
-  port: process.env.PORT,
-  nodeEnv: process.env.NODE_ENV,
-  qdrantUrl: process.env.QDRANT_URL,
-  qdrantApiKey: process.env.QDRANT_API_KEY,
-  openaiApiKey: process.env.OPENAI_API_KEY,
-  modelUrl: process.env.MODEL_URL && process.env.MODEL_URL.trim() !== '' ? process.env.MODEL_URL : undefined,
-  modelName: process.env.MODEL_NAME,
-};
-
-// Validate and export config
-const config = configSchema.parse(envVars);
-
-export default config;
+export type { 
+  PromptsConfig, 
+  EnrichmentPrompts, 
+  AnswerPrompts, 
+  ContextPrompts 
+} from '@/types/config/prompts-config.schema.js';
