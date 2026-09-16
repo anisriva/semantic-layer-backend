@@ -45,6 +45,9 @@ models:
 ragPipeline:
   ingestion:
     maxTokensPerChunk: 512
+    concurrency: 8
+    enrichmentConcurrency: 8
+    embeddingConcurrency: 8
     # Each entry is a regular expression tested against the full scanned
     # file path (see src/helpers/file-scanner.ts); a file is excluded if any
     # pattern matches. Directory/exact-filename patterns are anchored to a
@@ -63,6 +66,48 @@ ragPipeline:
       - "\\.swp$"
       - "\\.swo$"
       - "~$"
+      - "\\.crt$"
+
+      # Image files
+      - "\\.jpg$"
+      - "\\.jpeg$"
+      - "\\.png$"
+      - "\\.gif$"
+      - "\\.bmp$"
+      - "\\.tiff$"
+      - "\\.tif$"
+      - "\\.webp$"
+      - "\\.svg$"
+      - "\\.ico$"
+      - "\\.heic$"
+      - "\\.heif$"
+      - "\\.raw$"
+      - "\\.cr2$"
+      - "\\.nef$"
+      - "\\.arw$"
+
+      # Font files
+      - "\\.ttf$"
+      - "\\.woff$"
+      - "\\.woff2$"
+      - "\\.eot$"
+      - "\\.otf$"
+
+      # Video files
+      - "\\.mp4$"
+      - "\\.avi$"
+      - "\\.mov$"
+      - "\\.wmv$"
+      - "\\.flv$"
+      - "\\.webm$"
+      - "\\.mkv$"
+      - "\\.m4v$"
+      - "\\.3gp$"
+      - "\\.ogv$"
+      - "\\.mpeg$"
+      - "\\.mpg$"
+      - "\\.mts$"
+      - "\\.vob$"
 
       # Node.js/JavaScript/TypeScript
       - "(^|/)node_modules(/|$)"

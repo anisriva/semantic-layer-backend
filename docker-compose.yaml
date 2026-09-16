@@ -11,7 +11,8 @@ services:
       - qdrant_data:/qdrant/storage
     environment:
       - QDRANT__SERVICE__GRPC_PORT=6334
-      - QDRANT__LOG_LEVEL=DEBUG
+      - QDRANT__LOG_LEVEL=INFO
+    restart: unless-stopped
 
   ollama:
     image: ollama/ollama:latest
@@ -22,14 +23,17 @@ services:
       - ollama_data:/root/.ollama
     environment:
       - OLLAMA_KEEP_ALIVE=24h
-      - OLLAMA_NUM_THREAD=8
-      - OLLAMA_MAX_LOADED_MODELS=2
-      - OLLAMA_GPU_LAYERS=35
+      - OLLAMA_NUM_THREAD=6
+      - OLLAMA_MAX_LOADED_MODELS=1
+      - OLLAMA_NUM_PARALLEL=2
+      - OLLAMA_MAX_QUEUE=128
+      # Apple Silicon GPU acceleration (reduced for stability)
+      - OLLAMA_GPU_LAYERS=20
     deploy:
       resources:
         limits:
           cpus: '8'
-          memory: 16G
+          memory: 12G
         reservations:
           cpus: '4'
           memory: 8G
