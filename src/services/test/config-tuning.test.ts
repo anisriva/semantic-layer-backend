@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { QdrantClient } from '@qdrant/js-client-rest';
+import pLimit from 'p-limit';
 import { afterAll, describe, expect, it } from 'vitest';
 import { getFullAppConfig, getIngestionConfig, getRetrievalConfig, type FullAppConfig } from '@/config/index.js';
 import { HybridSearch } from '@/helpers/core/index.js';
@@ -114,10 +115,14 @@ describe('retrieval config tuning', () => {
       const ingestionConfig = getIngestionConfig(fullConfig);
       const files = await scanFiles(rootPath, ingestionConfig);
       const processed = await processSourceFiles(rootPath, files, ingestionConfig.maxTokensPerChunk);
-      const enriched = await enrichChunks(processed.chunks, createEnrichmentLlm(fullConfig));
+      const enriched = await enrichChunks(
+        processed.chunks,
+        createEnrichmentLlm(fullConfig),
+        pLimit(ingestionConfig.enrichmentConcurrency),
+      );
       const { embeddingProvider, vectorStore, bm25Index } = createCollectionProviders(COLLECTION_NAME, fullConfig);
       try {
-        await indexChunks(enriched, embeddingProvider, vectorStore, bm25Index);
+        await indexChunks(enriched, embeddingProvider, vectorStore, bm25Index, pLimit(ingestionConfig.embeddingConcurrency));
         const retrievalConfig = withRetrieval({}).ragPipeline.retrieval;
         const search = new HybridSearch(vectorStore, bm25Index, embeddingProvider, retrievalConfig);
         const results = await retrieve('Which function handles the request?', search, topK);
@@ -153,13 +158,17 @@ describe('retrieval config tuning', () => {
         const ingestionConfig = getIngestionConfig(fullConfig);
         const files = await scanFiles(rootPath, ingestionConfig);
         const processed = await processSourceFiles(rootPath, files, ingestionConfig.maxTokensPerChunk);
-        const enriched = await enrichChunks(processed.chunks, createEnrichmentLlm(fullConfig));
+        const enriched = await enrichChunks(
+          processed.chunks,
+          createEnrichmentLlm(fullConfig),
+          pLimit(ingestionConfig.enrichmentConcurrency),
+        );
         const { embeddingProvider, vectorStore, bm25Index } = createCollectionProviders(
           `${COLLECTION_NAME}-weights`,
           fullConfig,
         );
         try {
-          await indexChunks(enriched, embeddingProvider, vectorStore, bm25Index);
+          await indexChunks(enriched, embeddingProvider, vectorStore, bm25Index, pLimit(ingestionConfig.embeddingConcurrency));
           const retrievalConfig = withRetrieval({ bm25Weight, vectorWeight }).ragPipeline.retrieval;
           const search = new HybridSearch(vectorStore, bm25Index, embeddingProvider, retrievalConfig);
           const results = await retrieve('Which function locates a warehouse item?', search, 5);

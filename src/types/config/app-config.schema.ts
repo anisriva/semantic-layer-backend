@@ -49,6 +49,12 @@ export const embeddingModelConfigSchema = z.object({
   dimensions: z.number().int().positive(),
 });
 
+export const oauth2ConfigSchema = z.object({
+  oauthUrl: z.string().url(),
+  clientId: z.string(),
+  clientSecret: z.string(),
+}).optional();
+
 export const llmModelConfigSchema = z.object({
   baseUrl: z.string().url(),
   apiKey: z.string().optional(),
@@ -56,6 +62,7 @@ export const llmModelConfigSchema = z.object({
   maxRetries: z.number().int().positive(),
   retryDelayMs: z.number().int().positive(),
   timeout: z.number().int().positive(),
+  oauth2: oauth2ConfigSchema.optional(),
 });
 
 export const modelsConfigSchema = z.object({
@@ -66,6 +73,9 @@ export const modelsConfigSchema = z.object({
 
 export const ingestionConfigSchema = z.object({
   maxTokensPerChunk: z.number().int().positive(),
+  concurrency: z.number().int().positive().default(4),
+  enrichmentConcurrency: z.number().int().positive().default(2),
+  embeddingConcurrency: z.number().int().positive().default(2),
   excludePatterns: z.array(z.string()),
 });
 
@@ -95,6 +105,7 @@ export type RagDbConfig = z.infer<typeof ragDbConfigSchema>;
 export type AppDbConfig = z.infer<typeof appDbConfigSchema>;
 export type AppConfig = z.infer<typeof appConfigSchema>;
 export type EmbeddingModelConfig = z.infer<typeof embeddingModelConfigSchema>;
+export type OAuth2Config = z.infer<typeof oauth2ConfigSchema>;
 export type LlmModelConfig = z.infer<typeof llmModelConfigSchema>;
 export type ModelsConfig = z.infer<typeof modelsConfigSchema>;
 export type IngestionConfig = z.infer<typeof ingestionConfigSchema>;

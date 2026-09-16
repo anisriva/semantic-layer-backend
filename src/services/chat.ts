@@ -8,7 +8,7 @@
  * `ConversationService` can persist without `ChatService` itself depending
  * on Postgres.
  */
-import { getFullAppConfig, type FullAppConfig } from '@/config/index.js';
+import { getFullAppConfig, getAnswerModelConfig, type FullAppConfig } from '@/config/index.js';
 import { buildContext } from '@/helpers/context-builder.js';
 import { answerQuestion } from '@/helpers/answer-generator.js';
 import { createAnswerLlm } from '@/helpers/provider-factory.js';
@@ -42,15 +42,34 @@ export class ChatService {
    * @throws {ChatGenerationError} if answer generation fails.
    */
   async ask(collectionName: string, question: string): Promise<ChatAnswer> {
-    const results = await this.searchService.search(collectionName, question);
-    const context = buildContext(results);
+    const startedAt = Date.now();
+    const answerConfig = getAnswerModelConfig(this.fullConfig);
+    
+    console.log(`[Chat] Starting answer generation for collection "${collectionName}"`);
+    console.log(`[Chat] Question: "${question}"`);
+    console.log(`[Chat] Answer model: ${answerConfig.model}`);
+    console.log(`[Chat] Answer provider: ${answerConfig.baseUrl}`);
 
+    console.log('[Chat] Stage 1: Retrieving context...');
+    const results = await this.searchService.search(collectionName, question);
+    
+    console.log('[Chat] Stage 2: Building context from retrieved results...');
+    const context = buildContext(results);
+    console.log(`[Chat] Context built: ${context.length} characters`);
+
+    console.log('[Chat] Stage 3: Generating answer with LLM...');
     let answer: string;
     try {
-      answer = await answerQuestion(question, context, createAnswerLlm(this.fullConfig));
+      answer = await answerQuestion(question, context, createAnswerLlm(this.fullConfig), answerConfig.model);
+      const answerDuration = Date.now() - startedAt;
+      console.log(`[Chat] Answer generated in ${answerDuration}ms`);
+      console.log(`[Chat] Answer length: ${answer.length} characters`);
     } catch (error) {
       throw new ChatGenerationError('Failed to generate an answer', error);
     }
+
+    const totalDuration = Date.now() - startedAt;
+    console.log(`[Chat] Complete: Total duration ${totalDuration}ms`);
 
     return {
       answer,

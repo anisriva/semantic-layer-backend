@@ -16,7 +16,12 @@ export async function retrieve(
   search: HybridSearch,
   topK = 5,
 ): Promise<SearchResult[]> {
+  console.log(`[HybridRetriever] Executing search with topK=${topK}`);
   const result = await search.search(question, { topK });
-  if (result.isErr()) throw result.error;
+  if (result.isErr()) {
+    console.error('[HybridRetriever] Search failed:', result.error);
+    throw result.error;
+  }
+  console.log(`[HybridRetriever] Search completed successfully`);
   return result.value;
 }

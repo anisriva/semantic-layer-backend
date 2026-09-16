@@ -13,7 +13,9 @@ import { renderPrompt } from '@/config/index.js';
  * them into one context string for answer generation.
  */
 export function buildContext(results: SearchResult[]): string {
-  return results.map((result) => {
+  console.log(`[ContextBuilder] Building context from ${results.length} search results`);
+  
+  const context = results.map((result) => {
     const metadata = result.chunk?.metadata ?? result.metadata;
     const chunkContext = renderPrompt('context.chunkTemplate', {
       filePath: result.chunk?.filePath ?? 'unknown',
@@ -25,4 +27,7 @@ export function buildContext(results: SearchResult[]): string {
     });
     return chunkContext;
   }).join('\n\n---\n\n');
+  
+  console.log(`[ContextBuilder] Context assembly complete`);
+  return context;
 }

@@ -1,6 +1,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import pLimit from 'p-limit';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { getFullAppConfig, getIngestionConfig } from '@/config/index.js';
 import { scanFiles } from '@/helpers/file-scanner.js';
@@ -41,7 +42,11 @@ describe('chunk-enrichment helper', () => {
     );
     expect(processed.chunks.length).toBeGreaterThan(0);
 
-    const enriched = await enrichChunks(processed.chunks, createEnrichmentLlm(fullConfig));
+    const enriched = await enrichChunks(
+      processed.chunks,
+      createEnrichmentLlm(fullConfig),
+      pLimit(ingestionConfig.enrichmentConcurrency),
+    );
 
     expect(enriched).toHaveLength(processed.chunks.length);
     for (const chunk of enriched) {

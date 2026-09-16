@@ -5,7 +5,7 @@
  */
 
 import { getConfigValue } from '@/utils/env-loader.js';
-import { fullAppConfigSchema, type FullAppConfig, type AppConfig, type ModelsConfig, type RagPipelineConfig, type EmbeddingModelConfig, type LlmModelConfig, type IngestionConfig, type RetrievalConfig, type WorkerConfig, type QdrantConfig, type PostgresConfig } from '@/types/config/app-config.schema.js';
+import { fullAppConfigSchema, type FullAppConfig, type AppConfig, type ModelsConfig, type RagPipelineConfig, type EmbeddingModelConfig, type LlmModelConfig, type IngestionConfig, type RetrievalConfig, type WorkerConfig, type QdrantConfig, type PostgresConfig, type OAuth2Config } from '@/types/config/app-config.schema.js';
 
 let cachedConfig: FullAppConfig | null = null;
 
@@ -56,6 +56,11 @@ export function getFullAppConfig(forceReload = false): FullAppConfig {
         maxRetries: getConfigValue('models.enrichment.maxRetries', 2) as number,
         retryDelayMs: getConfigValue('models.enrichment.retryDelayMs', 1000) as number,
         timeout: getConfigValue('models.enrichment.timeout', 120000) as number,
+        oauth2: (getConfigValue('models.enrichment.oauth2.oauthUrl', undefined) ? {
+          oauthUrl: getConfigValue('models.enrichment.oauth2.oauthUrl', '') as string,
+          clientId: getConfigValue('models.enrichment.oauth2.clientId', '') as string,
+          clientSecret: getConfigValue('models.enrichment.oauth2.clientSecret', '') as string,
+        } : undefined) as OAuth2Config | undefined,
       },
       answer: {
         baseUrl: getConfigValue('models.answer.baseUrl', 'http://localhost:11434/v1') as string,
@@ -64,13 +69,25 @@ export function getFullAppConfig(forceReload = false): FullAppConfig {
         maxRetries: getConfigValue('models.answer.maxRetries', 2) as number,
         retryDelayMs: getConfigValue('models.answer.retryDelayMs', 1000) as number,
         timeout: getConfigValue('models.answer.timeout', 120000) as number,
+        oauth2: (getConfigValue('models.answer.oauth2.oauthUrl', undefined) ? {
+          oauthUrl: getConfigValue('models.answer.oauth2.oauthUrl', '') as string,
+          clientId: getConfigValue('models.answer.oauth2.clientId', '') as string,
+          clientSecret: getConfigValue('models.answer.oauth2.clientSecret', '') as string,
+        } : undefined) as OAuth2Config | undefined,
       },
     },
     ragPipeline: {
       ingestion: {
         maxTokensPerChunk: getConfigValue('ragPipeline.ingestion.maxTokensPerChunk', 512) as number,
+        concurrency: getConfigValue('ragPipeline.ingestion.concurrency', 8) as number,
+        enrichmentConcurrency: getConfigValue('ragPipeline.ingestion.enrichmentConcurrency', 8) as number,
+        embeddingConcurrency: getConfigValue('ragPipeline.ingestion.embeddingConcurrency', 8) as number,
         excludePatterns: getConfigValue('ragPipeline.ingestion.excludePatterns', [
-          '(^|/)node_modules(/|$)', '(^|/)dist(/|$)', '(^|/)\\.git(/|$)', '(^|/)coverage(/|$)',
+          '(^|/)node_modules(/|$)', '(^|/)dist(/|$)', '(^|/)\\.git(/|$)', '(^|/)coverage(/|$)', '\\.crt$',
+          '\\.jpg$', '\\.jpeg$', '\\.png$', '\\.gif$', '\\.bmp$', '\\.tiff$', '\\.tif$', '\\.webp$', '\\.svg$', '\\.ico$',
+          '\\.heic$', '\\.heif$', '\\.raw$', '\\.cr2$', '\\.nef$', '\\.arw$',
+          '\\.mp4$', '\\.avi$', '\\.mov$', '\\.wmv$', '\\.flv$', '\\.webm$', '\\.mkv$', '\\.m4v$', '\\.3gp$', '\\.ogv$',
+          '\\.mpeg$', '\\.mpg$', '\\.mts$', '\\.vob$',
         ]) as string[],
       },
       retrieval: {

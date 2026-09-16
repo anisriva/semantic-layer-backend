@@ -44,10 +44,14 @@ describe('IndexingService', () => {
     const result = await service.indexPath(rootPath, COLLECTION_NAME);
 
     expect(result.fileCount).toBe(2);
-    expect(result.chunkCount).toBeGreaterThan(0);
+    expect(result.chunkCount).toBe(2);
     expect(result.enrichedChunkCount).toBe(result.chunkCount);
     expect(result.graphNodeCount).toBeGreaterThan(0);
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
+
+    const client = new QdrantClient({ checkCompatibility: false, url: getFullAppConfig().app.ragDb.qdrant.url });
+    const collection = await client.collectionExists(COLLECTION_NAME);
+    expect(collection.exists).toBe(true);
 
     const vectorStore = createVectorStore(COLLECTION_NAME);
     const count = await vectorStore.count();

@@ -58,8 +58,11 @@ describe('app.yaml exposure', () => {
     expect(getAtPath(fullConfig, path)).toBeDefined();
   });
 
-  it('exposes ragPipeline.ingestion.excludePatterns with the expected shape via getIngestionConfig', () => {
+  it('exposes ragPipeline.ingestion settings with the expected shape via getIngestionConfig', () => {
     const ingestionConfig = getIngestionConfig(fullConfig);
+    expect(ingestionConfig.concurrency).toBeGreaterThan(0);
+    expect(ingestionConfig.enrichmentConcurrency).toBeGreaterThan(0);
+    expect(ingestionConfig.embeddingConcurrency).toBeGreaterThan(0);
     expect(Array.isArray(ingestionConfig.excludePatterns)).toBe(true);
     expect(ingestionConfig.excludePatterns.length).toBeGreaterThan(0);
     expect(ingestionConfig.excludePatterns.some((pattern) => pattern.includes('node_modules'))).toBe(true);

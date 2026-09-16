@@ -10,6 +10,7 @@
 import {
   getFullAppConfig,
   getRetrievalConfig,
+  getEmbeddingModelConfig,
   type FullAppConfig,
 } from '@/config/index.js';
 import { HybridSearch, type SearchResult } from '@/helpers/core/index.js';
@@ -50,16 +51,33 @@ export class SearchService {
     query: string,
     options: SearchOptions = {},
   ): Promise<SearchResult[]> {
+    const startedAt = Date.now();
+    const topK = options.topK ?? getRetrievalConfig(this.fullConfig).topK;
+    const embeddingConfig = getEmbeddingModelConfig(this.fullConfig);
+    
+    console.log(`[Search] Starting hybrid retrieval for collection "${collectionName}"`);
+    console.log(`[Search] Query: "${query}"`);
+    console.log(`[Search] Top-K: ${topK}`);
+    console.log(`[Search] Embedding model: ${embeddingConfig.model}`);
+    console.log(`[Search] Embedding provider: ${embeddingConfig.baseUrl}`);
+    
+    const retrievalConfig = getRetrievalConfig(this.fullConfig);
+    console.log(`[Search] Retrieval weights: vector=${retrievalConfig.vectorWeight}, BM25=${retrievalConfig.bm25Weight}`);
+
     const { embeddingProvider, vectorStore, bm25Index } = createCollectionProviders(
       collectionName,
       this.fullConfig,
     );
 
     try {
+      console.log('[Search] Checking collection status...');
       const count = await vectorStore.count();
       if (count.isErr()) throw new SearchError('Failed to inspect collection', count.error);
+      
+      console.log(`[Search] Collection has ${count.value} indexed points`);
       if (count.value === 0) throw new NotIndexedError(collectionName);
 
+      console.log('[Search] Initializing hybrid search...');
       const search = new HybridSearch(
         vectorStore,
         bm25Index,
@@ -68,11 +86,23 @@ export class SearchService {
       );
 
       try {
-        return await retrieve(query, search, options.topK ?? getRetrievalConfig(this.fullConfig).topK);
+        console.log('[Search] Executing hybrid retrieval (vector + BM25)...');
+        const results = await retrieve(query, search, topK);
+        const duration = Date.now() - startedAt;
+        
+        console.log(`[Search] Retrieved ${results.length} results in ${duration}ms`);
+        results.forEach((result, index) => {
+          const filePath = result.chunk?.filePath ?? 'unknown';
+          const score = result.score.toFixed(4);
+          console.log(`[Search]   [${index + 1}] ${filePath} (score: ${score})`);
+        });
+        
+        return results;
       } catch (error) {
         throw new SearchError('Hybrid retrieval failed', error);
       }
     } finally {
+      console.log('[Search] Cleaning up vector store connection...');
       vectorStore.close();
     }
   }

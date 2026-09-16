@@ -39,7 +39,7 @@ describe('local-folder-in, answer-out pipeline', () => {
       const indexResult = await indexingService.indexPath(rootPath, COLLECTION_NAME);
 
       expect(indexResult.fileCount).toBe(3);
-      expect(indexResult.chunkCount).toBeGreaterThan(0);
+      expect(indexResult.chunkCount).toBe(indexResult.fileCount);
       expect(indexResult.enrichedChunkCount).toBe(indexResult.chunkCount);
       expect(indexResult.graphNodeCount).toBeGreaterThan(0);
       expect(indexResult.graphEdgeCount).toBeGreaterThan(0);
