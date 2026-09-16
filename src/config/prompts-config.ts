@@ -3,7 +3,7 @@
  * Loads and validates prompts.yaml with Nunjucks templating
  */
 
-import * as nunjucks from 'nunjucks';
+import nunjucks from 'nunjucks';
 import { loadPromptsConfig } from '@/utils/yaml-loader.js';
 import { promptsConfigSchema, type PromptsConfig } from '@/types/config/prompts-config.schema.js';
 
