@@ -48,10 +48,94 @@ enum JobStatus {
   failed
 }
 
-enum AuditStatus {
-  started
-  completed
-  failed
+// Pipeline Stages
+enum PipelineStage {
+  // Job lifecycle stages
+  JOB_CLAIM
+  JOB_HEARTBEAT
+  JOB_COMPLETE
+  JOB_RETRY
+  JOB_FAILED
+
+  // Git operations (Phase 4 - future)
+  GIT_CONNECT_REPO
+  GIT_CLONE_REPO
+  GIT_DIFF
+
+  // Repository operations
+  RESOLVE_SOURCE
+  RESET_COLLECTION
+  REFRESH_COLLECTION
+
+  // Indexing pipeline stages
+  SCAN_FILES
+  INITIALIZE_PROVIDERS
+  PARSE_FILES
+  GENERATE_CHUNKS
+  BUILD_GRAPH
+  ENRICH_CHUNKS
+  EMBED_CHUNKS
+  INDEX_CHUNKS
+  PROCESS_DOCUMENTATION
+
+  // Chat pipeline stages (ChatService: hybrid retrieval, then LLM answer
+  // generation — the two real, independently-timed boundaries in
+  // `src/services/chat.ts` / `src/services/search.ts` today)
+  RETRIEVAL
+  CHAT_COMPLETION
+}
+
+// Pipeline Status
+enum PipelineStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  SKIPPED
+  RETRYING
+}
+
+// Scan Type
+enum ScanType {
+  FULL
+  DIFF
+}
+
+// Metrics Type Categorization
+enum MetricsType {
+  PERFORMANCE
+  COST
+  RESOURCE
+  QUALITY
+  BUSINESS
+}
+
+// Top-level execution context for an AuditLog entry: what kind of system
+// execution caused it — background job processing or interactive chat.
+enum OperationType {
+  JOB
+  CHAT
+}
+
+// The specific billable/model activity a CostMetrics row accounts for.
+// Answers "what activity consumed the model/provider resources?" —
+// independent of whether that activity happened during JOB or CHAT
+// execution (e.g. EMBEDDING happens both for JOB chunk embedding and for
+// CHAT query embedding).
+enum CostOperationType {
+  EMBEDDING
+  ENRICHMENT
+  CHAT_COMPLETION
+  RETRIEVAL
+}
+
+// Provider Type
+enum ProviderType {
+  OPENAI
+  OLLAMA
+  AZURE
+  ANTHROPIC
+  CUSTOM
 }
 
 enum MessageRole {
@@ -71,6 +155,8 @@ model User {
   repository_access RepositoryAccess[]
   conversations     Conversation[]
   access_requests   AccessRequest[]
+  triggered_jobs    Job[]             @relation("JobTriggeredBy")
+  audit_logs        AuditLog[]
 
   @@index([email])
   @@index([role])
@@ -145,6 +231,9 @@ model Job {
   worker_id       String?
   error_message   String?
   retry_count     Int       @default(0)
+  triggered_by    String?   // User who triggered the job
+  scan_type       ScanType? // FULL vs DIFF (moved from AuditLog)
+  job_metadata    Json?     // Additional job-level context
   created_at      DateTime  @default(now())
   started_at      DateTime?
   completed_at    DateTime?
@@ -154,26 +243,157 @@ model Job {
   last_processed_by Repository[] @relation("RepositoryLastProcessedJob")
   audit_logs        AuditLog[]
   job_logs          JobLog[]
+  triggered_by_user User?        @relation("JobTriggeredBy", fields: [triggered_by], references: [id])
 
   @@index([status, created_at])
   @@index([repository_id])
   @@index([worker_id])
+  @@index([scan_type])
+  @@index([triggered_by])
 }
 
 model AuditLog {
-  id              String      @id @default(uuid())
-  job_id          String
-  step            String
-  status          AuditStatus
-  metrics         Json?
-  error_message   String?
-  started_at      DateTime    @default(now())
+  id              String        @id @default(uuid())
+  operation_type  OperationType // Discriminator: JOB execution vs CHAT execution
+  job_id          String?       // Required (and exclusive) when operation_type = JOB
+  conversation_id String?      // Required (and exclusive) when operation_type = CHAT
+  message_id      String?       // Optional: the user Message that triggered a CHAT execution
+  stage           PipelineStage
+  status          PipelineStatus
+  metrics_type    MetricsType   // Explicit categorization
+  started_at      DateTime      @default(now())
   completed_at    DateTime?
+  user_id         String?       // User attribution
+  worker_id       String?       // Worker tracking
 
-  job Job @relation(fields: [job_id], references: [id])
+  job                  Job?                 @relation(fields: [job_id], references: [id])
+  conversation         Conversation?         @relation(fields: [conversation_id], references: [id])
+  message              Message?             @relation(fields: [message_id], references: [id])
+  user                 User?                @relation(fields: [user_id], references: [id])
+  performance_metrics  PerformanceMetrics?
+  cost_metrics         CostMetrics?
+  resource_metrics     ResourceMetrics?
+  quality_metrics      QualityMetrics?
+  business_metrics     BusinessMetrics?
 
-  @@index([job_id, step])
+  @@index([job_id, stage])
+  @@index([conversation_id, stage])
+  @@index([message_id])
+  @@index([operation_type])
   @@index([status])
+  @@index([user_id])
+  @@index([metrics_type])
+}
+
+// Performance Metrics Schema
+model PerformanceMetrics {
+  id                    String   @id @default(uuid())
+  audit_log_id          String   @unique
+  duration_ms           Int
+  files_processed       Int?
+  chunks_generated      Int?
+  files_per_second      Float?
+  chunks_per_second     Float?
+  scan_file_count       Int?
+  scan_duration_ms      Int?
+  scan_files_per_second Float?
+  processing_successful_files Int?
+  processing_failed_files     Int?
+  processing_total_files      Int?
+  processing_duration_ms      Int?
+  processing_success_rate     Float?
+  graph_node_count            Int?
+  graph_edge_count            Int?
+  graph_duration_ms           Int?
+  graph_density               Float?
+
+  audit_log AuditLog @relation(fields: [audit_log_id], references: [id])
+
+  @@index([audit_log_id])
+}
+
+// Cost Metrics Schema
+model CostMetrics {
+  id                           String   @id @default(uuid())
+  audit_log_id                 String   @unique
+  cost_operation_type          CostOperationType // What activity consumed the model/provider resources
+  provider_type                ProviderType
+  model_name                   String
+  base_url                     String?
+  prompt_tokens                Int?
+  completion_tokens            Int?
+  total_tokens                 Int?
+  cost_usd                     Float?
+  cost_per_1k_prompt_tokens    Float?
+  cost_per_1k_completion_tokens Float?
+  duration_ms                  Int?
+  chunk_count                  Int?
+
+  audit_log AuditLog @relation(fields: [audit_log_id], references: [id])
+
+  @@index([audit_log_id])
+  @@index([cost_operation_type])
+  @@index([provider_type])
+}
+
+// Resource Metrics Schema
+model ResourceMetrics {
+  id                    String   @id @default(uuid())
+  audit_log_id          String   @unique
+  memory_used_mb        Float?
+  memory_peak_mb        Float?
+  cpu_percent           Float?
+  cpu_time_ms           Int?
+  storage_used_mb       Float?
+  storage_freed_mb      Float?
+  network_bytes_sent    BigInt?
+  network_bytes_received BigInt?
+  active_workers        Int?
+  queue_depth           Int?
+
+  audit_log AuditLog @relation(fields: [audit_log_id], references: [id])
+
+  @@index([audit_log_id])
+}
+
+// Quality Metrics Schema
+model QualityMetrics {
+  id                      String   @id @default(uuid())
+  audit_log_id            String   @unique
+  parse_success_rate      Float?
+  enrichment_success_rate Float?
+  indexing_success_rate   Float?
+  average_chunk_size      Float?
+  empty_chunks            Int?
+  duplicate_chunks        Int?
+  graph_connectivity      Float?
+  orphan_nodes            Int?
+  checksum_passed         Boolean?
+  integrity_total_checks  Int?
+  integrity_passed_checks Int?
+  integrity_failed_checks Int?
+
+  audit_log AuditLog @relation(fields: [audit_log_id], references: [id])
+
+  @@index([audit_log_id])
+}
+
+// Business Metrics Schema
+model BusinessMetrics {
+  id                    String   @id @default(uuid())
+  audit_log_id          String   @unique
+  repositories_indexed  Int?
+  users_affected        Int?
+  query_count           Int?
+  unique_queries        Int?
+  user_satisfaction     Float?
+  resolution_rate       Float?
+  sla_compliance        Boolean?
+  priority_level         String?
+
+  audit_log AuditLog @relation(fields: [audit_log_id], references: [id])
+
+  @@index([audit_log_id])
 }
 
 enum JobLogLevel {
@@ -212,6 +432,7 @@ model Conversation {
   repository Repository @relation(fields: [repository_id], references: [id])
   user       User       @relation(fields: [user_id], references: [id])
   messages   Message[]
+  audit_logs AuditLog[]
 
   @@index([repository_id])
   @@index([user_id])
@@ -226,6 +447,7 @@ model Message {
   created_at      DateTime    @default(now())
 
   conversation Conversation @relation(fields: [conversation_id], references: [id])
+  audit_logs   AuditLog[]
 
   @@index([conversation_id])
   @@index([created_at])
