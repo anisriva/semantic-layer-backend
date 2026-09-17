@@ -11,6 +11,7 @@
 import { getWorkerConfig, getFullAppConfig, type FullAppConfig } from '@/config/index.js';
 import { JobQueueService, IndexingService } from '@/services/index.js';
 import { RepositoryDao, AuditLogDao, JobLogDao } from '@/daos/index.js';
+import { PipelineStage, MetricsType, ScanType } from '@/types/audit.js';
 import { resolveSource } from '@/helpers/source-resolver.js';
 import { resetCollection } from '@/helpers/collection-reset.js';
 import { withJobLogCapture } from '@/helpers/job-log-capture.js';
@@ -229,34 +230,46 @@ class Worker {
   private async processIndexJob(job: any, repository: any, collectionName: string): Promise<void> {
     console.log(`[Worker ${this.workerId}] Processing INDEX job ${job.id}`);
 
-    // Resolve the repository to a local path. LOCAL sources are validated
-    // directly; GIT sources will be cloned/pulled once the Git Integration
-    // phase implements that branch of source-resolver.ts.
+    const resolveStartedAt = Date.now();
     const { path: repoPath } = await resolveSource(repository);
 
     // Record audit log for indexing start
-    await this.auditLogDao.createStarted(job.id, 'INDEXING');
+    await this.auditLogDao.createStartedForJob(job.id, PipelineStage.RESOLVE_SOURCE, MetricsType.PERFORMANCE, {
+      userId: job.triggered_by || undefined,
+      workerId: this.workerId,
+    });
 
     try {
       // Run indexing with job context for audit logging
       const result = await this.indexingService.indexPath(repoPath, collectionName, {
         jobId: job.id,
         auditLogDao: this.auditLogDao,
+        userId: job.triggered_by || undefined,
+        scanType: job.scan_type || ScanType.FULL,
       });
 
       console.log(`[Worker ${this.workerId}] INDEX job ${job.id} completed:`, result);
 
       // Record audit log for indexing completion
-      await this.auditLogDao.createCompleted(job.id, 'INDEXING', {
-        chunkCount: result.chunkCount,
-        fileCount: result.fileCount,
-        durationMs: result.durationMs,
-        graphNodeCount: result.graphNodeCount,
-        graphEdgeCount: result.graphEdgeCount,
+      const resolveDurationMs = Date.now() - resolveStartedAt;
+      await this.auditLogDao.createCompletedWithPerformanceForJob(job.id, PipelineStage.RESOLVE_SOURCE, {
+        duration_ms: resolveDurationMs,
+        files_processed: result.fileCount,
+        chunks_generated: result.chunkCount,
+        files_per_second: result.fileCount / (resolveDurationMs / 1000),
+        chunks_per_second: result.chunkCount / (resolveDurationMs / 1000),
+        graph_node_count: result.graphNodeCount,
+        graph_edge_count: result.graphEdgeCount,
+      }, {
+        userId: job.triggered_by || undefined,
+        workerId: this.workerId,
       });
     } catch (error) {
       // Record audit log for indexing failure
-      await this.auditLogDao.createFailed(job.id, 'INDEXING', error instanceof Error ? error.message : String(error));
+      await this.auditLogDao.createFailedForJob(job.id, PipelineStage.RESOLVE_SOURCE, MetricsType.PERFORMANCE, {
+        userId: job.triggered_by || undefined,
+        workerId: this.workerId,
+      });
       throw error;
     }
   }
@@ -279,39 +292,67 @@ class Worker {
     const { path: repoPath } = await resolveSource(repository);
 
     // Record audit log for the pre-refresh collection reset
-    await this.auditLogDao.createStarted(job.id, 'COLLECTION_RESET');
+    const resetStartedAt = Date.now();
+    await this.auditLogDao.createStartedForJob(job.id, PipelineStage.RESET_COLLECTION, MetricsType.PERFORMANCE, {
+      userId: job.triggered_by || undefined,
+      workerId: this.workerId,
+    });
     try {
       await resetCollection(collectionName, this.config);
       console.log(`[Worker ${this.workerId}] Collection "${collectionName}" reset before full re-scan`);
-      await this.auditLogDao.createCompleted(job.id, 'COLLECTION_RESET', { collectionName });
+      const resetDurationMs = Date.now() - resetStartedAt;
+      await this.auditLogDao.createCompletedWithPerformanceForJob(job.id, PipelineStage.RESET_COLLECTION, {
+        duration_ms: resetDurationMs,
+      }, {
+        userId: job.triggered_by || undefined,
+        workerId: this.workerId,
+      });
     } catch (error) {
-      await this.auditLogDao.createFailed(job.id, 'COLLECTION_RESET', error instanceof Error ? error.message : String(error));
+      await this.auditLogDao.createFailedForJob(job.id, PipelineStage.RESET_COLLECTION, MetricsType.PERFORMANCE, {
+        userId: job.triggered_by || undefined,
+        workerId: this.workerId,
+      });
       throw error;
     }
 
     // Record audit log for refresh start
-    await this.auditLogDao.createStarted(job.id, 'REFRESH');
+    const refreshStartedAt = Date.now();
+    await this.auditLogDao.createStartedForJob(job.id, PipelineStage.REFRESH_COLLECTION, MetricsType.PERFORMANCE, {
+      userId: job.triggered_by || undefined,
+      workerId: this.workerId,
+    });
 
     try {
       // Run indexing with job context for audit logging
       const result = await this.indexingService.indexPath(repoPath, collectionName, {
         jobId: job.id,
         auditLogDao: this.auditLogDao,
+        userId: job.triggered_by || undefined,
+        scanType: job.scan_type || ScanType.FULL,
       });
 
       console.log(`[Worker ${this.workerId}] REFRESH job ${job.id} completed:`, result);
 
       // Record audit log for refresh completion
-      await this.auditLogDao.createCompleted(job.id, 'REFRESH', {
-        chunkCount: result.chunkCount,
-        fileCount: result.fileCount,
-        durationMs: result.durationMs,
-        graphNodeCount: result.graphNodeCount,
-        graphEdgeCount: result.graphEdgeCount,
+      const refreshDurationMs = Date.now() - refreshStartedAt;
+      await this.auditLogDao.createCompletedWithPerformanceForJob(job.id, PipelineStage.REFRESH_COLLECTION, {
+        duration_ms: refreshDurationMs,
+        files_processed: result.fileCount,
+        chunks_generated: result.chunkCount,
+        files_per_second: result.fileCount / (refreshDurationMs / 1000),
+        chunks_per_second: result.chunkCount / (refreshDurationMs / 1000),
+        graph_node_count: result.graphNodeCount,
+        graph_edge_count: result.graphEdgeCount,
+      }, {
+        userId: job.triggered_by || undefined,
+        workerId: this.workerId,
       });
     } catch (error) {
       // Record audit log for refresh failure
-      await this.auditLogDao.createFailed(job.id, 'REFRESH', error instanceof Error ? error.message : String(error));
+      await this.auditLogDao.createFailedForJob(job.id, PipelineStage.REFRESH_COLLECTION, MetricsType.PERFORMANCE, {
+        userId: job.triggered_by || undefined,
+        workerId: this.workerId,
+      });
       throw error;
     }
   }
