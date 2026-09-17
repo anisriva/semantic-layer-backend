@@ -80,10 +80,10 @@ describe('ConversationService — SSE streaming (askQuestionStream)', () => {
 
     const messages = await conversationService.listMessages(conversation.id);
     expect(messages).toHaveLength(2);
-    expect(messages[0].role).toBe('user');
-    expect(messages[0].content).toBe('Which function calculates a discount?');
-    expect(messages[1].role).toBe('assistant');
-    expect(messages[1].content).toBe(fullAnswer);
+    expect(messages[0]?.role).toBe('user');
+    expect(messages[0]?.content).toBe('Which function calculates a discount?');
+    expect(messages[1]?.role).toBe('assistant');
+    expect(messages[1]?.content).toBe(fullAnswer);
   }, 60_000);
 
   it('rejects streaming against a nonexistent conversation', async () => {

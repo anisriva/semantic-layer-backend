@@ -76,7 +76,11 @@ export class ConversationController {
   async listMessages(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
-      const conversationId = Array.isArray(id) ? id[0] : id;
+      if (!id) {
+        res.status(400).json({ error: 'Conversation ID is required' });
+        return;
+      }
+      const conversationId: string = Array.isArray(id) ? (id[0] ?? '') : id;
 
       const conversation = await this.conversationService.getConversation(conversationId);
       if (!conversation) {
@@ -114,7 +118,11 @@ export class ConversationController {
   async streamMessage(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id: rawId } = req.params;
-      const conversationId = Array.isArray(rawId) ? rawId[0] : rawId;
+      if (!rawId) {
+        res.status(400).json({ error: 'Conversation ID is required' });
+        return;
+      }
+      const conversationId: string = Array.isArray(rawId) ? (rawId[0] ?? '') : rawId;
       const { content } = req.body ?? {};
 
       if (!content || typeof content !== 'string') {
@@ -125,6 +133,11 @@ export class ConversationController {
       const conversation = await this.conversationService.getConversation(conversationId);
       if (!conversation) {
         res.status(404).json({ error: 'Conversation not found' });
+        return;
+      }
+
+      if (!conversation.repository) {
+        res.status(404).json({ error: 'Repository not found for conversation' });
         return;
       }
 
