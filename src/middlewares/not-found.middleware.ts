@@ -7,3 +7,5 @@ export function notFoundHandler(req: Request, res: Response): void {
     error: `Route ${req.method} ${req.path} not found`,
   });
 }
+
+export const notFound = notFoundHandler;
