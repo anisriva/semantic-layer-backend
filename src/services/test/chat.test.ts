@@ -57,5 +57,20 @@ describe('ChatService', () => {
       expect(result.sources.length).toBeGreaterThan(0);
       expect(result.sources.some((source) => source.filePath.includes('shipping.ts'))).toBe(true);
     }, 60_000);
+
+    it('streams a scope-bound answer token-by-token via askStream', async () => {
+      const result = await chatService.askStream(COLLECTION_NAME, 'Which function calculates shipping cost?');
+
+      expect(result.sources.length).toBeGreaterThan(0);
+      expect(result.sources.some((source) => source.filePath.includes('shipping.ts'))).toBe(true);
+
+      const chunks: string[] = [];
+      for await (const chunk of result.textStream) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks.length).toBeGreaterThan(0);
+      expect(chunks.join('').length).toBeGreaterThan(0);
+    }, 60_000);
   });
 });

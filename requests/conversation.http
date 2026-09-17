@@ -1,0 +1,87 @@
+### Conversation / Chat API Requests
+### Base URL: http://localhost:3000/api/v1
+###
+### NOTE: Conversations are repository-scoped (architecture Section 14) and
+### require the repository to already have at least one successfully
+### completed INDEX/REFRESH job (see repository.http) — otherwise streaming
+### a message fails with a NotIndexedError. There is no authentication in
+### the MVP, so conversations are attributed to the MVP service user
+### automatically; no `userId` is accepted on the request body.
+
+#############################################
+# Variables
+#############################################
+
+@repository_id = 56d0da5b-60bb-4359-b6ad-60433bdd7ac9
+@conversation_id = a34889ff-d907-49db-af22-e2313a9280fd
+
+#############################################
+# Conversation CRUD Operations
+#############################################
+
+### Create a new conversation for a repository
+
+POST http://localhost:3000/api/v1/conversations
+Content-Type: application/json
+
+{
+  "repositoryId": "{{repository_id}}",
+  "title": "Questions about the shipping module"
+}
+
+### List conversations for a repository
+GET http://localhost:3000/api/v1/conversations?repositoryId={{repository_id}}
+
+### List conversations for a repository with pagination
+GET http://localhost:3000/api/v1/conversations?repositoryId={{repository_id}}&limit=10&offset=0
+
+### List messages for a conversation
+GET http://localhost:3000/api/v1/conversations/{{conversation_id}}/messages
+
+#############################################
+# Chat (SSE streaming)
+#############################################
+
+### Ask a question in a conversation (SSE)
+### Persists the user message immediately, then streams the assistant's
+### answer token-by-token as `event: message` / `data: { "chunk": "..." }`
+### frames, closing with `event: done`. On failure (e.g. the repository
+### isn't indexed yet), closes with `event: error` instead — the user
+### message is still persisted; the assistant message is only persisted if
+### at least some text was generated before the failure.
+###
+### REST Client renders SSE as a growing response body; for a real UI, use
+### EventSource / fetch+ReadableStream against this URL instead.
+POST http://localhost:3000/api/v1/conversations/{{conversation_id}}/messages
+Content-Type: application/json
+Accept: text/event-stream
+
+{
+  "content": "Which function calculates the shipping cost?"
+}
+
+#############################################
+# Example Workflow
+#############################################
+
+### Step 1: Create a conversation for an already-indexed repository
+# @name createConversation
+POST http://localhost:3000/api/v1/conversations
+Content-Type: application/json
+
+{
+  "repositoryId": "{{repository_id}}",
+  "title": "Test conversation"
+}
+
+### Step 2: Ask a question (SSE) using the conversation ID from Step 1
+POST http://localhost:3000/api/v1/conversations/{{createConversation.response.body.$.id}}/messages
+Content-Type: application/json
+Accept: text/event-stream
+
+{
+  "content": "What does this repository do?"
+}
+
+### Step 3: Read back the full message history
+GET http://localhost:3000/api/v1/conversations/{{createConversation.response.body.$.id}}/messages

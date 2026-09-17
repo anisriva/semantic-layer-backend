@@ -22,7 +22,7 @@ import {
   renderPrompt,
   type FullAppConfig,
 } from '@/config/index.js';
-import { OpenAICompatibleLlm } from '@/connectors/openai-compatible-llm.js';
+import { OpenAICompatibleLlm, type StreamingLLMProvider } from '@/connectors/openai-compatible-llm.js';
 
 export interface CollectionProviders {
   bm25Index: BM25Index;
@@ -44,10 +44,15 @@ export function createEnrichmentLlm(
   return new OpenAICompatibleLlm(getEnrichmentModelConfig(fullConfig));
 }
 
-/** Constructs the answer-role LLM provider from config, with the answer system prompt applied. */
+/**
+ * Constructs the answer-role LLM provider from config, with the answer
+ * system prompt applied. Typed as `StreamingLLMProvider` (a superset of
+ * `LLMProvider`) so `ChatService.askStream` can drive token-by-token SSE
+ * responses (Section 14) through the same factory as `ChatService.ask`.
+ */
 export function createAnswerLlm(
   fullConfig: FullAppConfig = getFullAppConfig(),
-): LLMProvider {
+): StreamingLLMProvider {
   return new OpenAICompatibleLlm({
     ...getAnswerModelConfig(fullConfig),
     systemPrompt: renderPrompt('answer.systemPrompt', {}),

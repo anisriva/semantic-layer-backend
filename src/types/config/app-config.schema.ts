@@ -16,6 +16,7 @@ export const workerConfigSchema = z.object({
   heartbeatIntervalMs: z.number().int().positive(),
   staleAfterMs: z.number().int().positive(),
   maxRetries: z.number().int().positive(),
+  logStreamPollIntervalMs: z.number().int().positive(),
 });
 
 export const qdrantConfigSchema = z.object({

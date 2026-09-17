@@ -29,6 +29,7 @@ export function getFullAppConfig(forceReload = false): FullAppConfig {
         heartbeatIntervalMs: getConfigValue('app.worker.heartbeatIntervalMs', 30000) as number,
         staleAfterMs: getConfigValue('app.worker.staleAfterMs', 300000) as number,
         maxRetries: getConfigValue('app.worker.maxRetries', 3) as number,
+        logStreamPollIntervalMs: getConfigValue('app.worker.logStreamPollIntervalMs', 1000) as number,
       },
       ragDb: {
         qdrant: {

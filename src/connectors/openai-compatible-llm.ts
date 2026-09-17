@@ -26,11 +26,30 @@ export interface OpenAICompatibleLlmOptions {
   };
 }
 
+/**
+ * Extends `LLMProvider` with token-by-token streaming for SSE chat
+ * endpoints (Section 14). Not part of the `@code-rag/core` contract — the
+ * package's `LLMProvider` interface only exposes single-shot `generate`,
+ * so this stays a connector-level addition, used only by the chat pipeline.
+ */
+export interface StreamingLLMProvider extends LLMProvider {
+  /**
+   * Streams the answer to `prompt` as it is generated.
+   *
+   * @throws {LLMError} if the request fails before or during streaming.
+   */
+  generateStream(prompt: string): AsyncGenerator<string, void, unknown>;
+}
+
 interface ChatCompletionResponse {
   choices?: Array<{ message?: { content?: string } }>;
 }
 
-export class OpenAICompatibleLlm implements LLMProvider {
+interface ChatCompletionChunk {
+  choices?: Array<{ delta?: { content?: string } }>;
+}
+
+export class OpenAICompatibleLlm implements StreamingLLMProvider {
   private oauthRefresh?: Promise<Result<void, LLMError>>;
   private oauthToken?: string;
   private requestSequence = 0;
@@ -135,37 +154,19 @@ export class OpenAICompatibleLlm implements LLMProvider {
 
   private async request(prompt: string): Promise<Result<string, LLMError>> {
     try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-
-      // Use OAuth2 token if available, otherwise fall back to apiKey
-      if (this.oauthToken) {
-        headers.Authorization = `Bearer ${this.oauthToken}`;
-      } else if (this.options.apiKey) {
-        headers.Authorization = `Bearer ${this.options.apiKey}`;
-      }
-
-      const systemPrompt = this.options.systemPrompt ?? renderPrompt('answer.systemPrompt', {});
-      const messages = [
-        { content: systemPrompt, role: 'system' },
-        { content: prompt, role: 'user' },
-      ];
-
-      const response = await fetch(`${this.options.baseUrl.replace(/\/+$/, '')}/chat/completions`, {
+      const response = await fetch(this.chatCompletionsUrl(), {
         body: JSON.stringify({
-          messages,
+          messages: this.buildMessages(prompt),
           model: this.options.model,
           stream: false,
           temperature: 0,
         }),
-        headers,
+        headers: this.buildHeaders(),
         method: 'POST',
         signal: AbortSignal.timeout(this.options.timeout ?? 120_000),
       });
       if (!response.ok) {
-        if (response.status === 401 && this.isOAuth2Configured()) {
-          this.oauthToken = undefined;
-          this.tokenExpiry = undefined;
-        }
+        this.clearOAuthTokenOn401(response.status);
         return err(new LLMError(`LLM API returned ${response.status}: ${await response.text()}`));
       }
       const body = await response.json() as ChatCompletionResponse;
@@ -174,6 +175,125 @@ export class OpenAICompatibleLlm implements LLMProvider {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       return err(new LLMError(`LLM request failed: ${message}`));
+    }
+  }
+
+  /**
+   * Streams the answer as it is generated, yielding text deltas parsed from
+   * the endpoint's OpenAI-compatible `text/event-stream` response. Performs
+   * a single attempt (no retry loop) — the caller (SSE conversation
+   * endpoint) is responsible for surfacing a thrown `LLMError` to the client.
+   */
+  async *generateStream(prompt: string): AsyncGenerator<string, void, unknown> {
+    if (this.isOAuth2Configured()) {
+      const refreshResult = await this.ensureOAuthToken();
+      if (refreshResult.isErr()) throw refreshResult.error;
+    }
+
+    const requestId = ++this.requestSequence;
+    const requestStartedAt = Date.now();
+    log('info', 'LLM_STREAM_REQUEST_START', 'LLM streaming request started', { requestId });
+
+    let response: Response;
+    try {
+      response = await fetch(this.chatCompletionsUrl(), {
+        body: JSON.stringify({
+          messages: this.buildMessages(prompt),
+          model: this.options.model,
+          stream: true,
+          temperature: 0,
+        }),
+        headers: this.buildHeaders(),
+        method: 'POST',
+        signal: AbortSignal.timeout(this.options.timeout ?? 120_000),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      throw new LLMError(`LLM streaming request failed: ${message}`);
+    }
+
+    if (!response.ok || !response.body) {
+      this.clearOAuthTokenOn401(response.status);
+      throw new LLMError(`LLM API returned ${response.status}: ${await response.text()}`);
+    }
+
+    let receivedAnyContent = false;
+    try {
+      for await (const delta of parseSseDeltas(response.body)) {
+        receivedAnyContent = true;
+        yield delta;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      throw new LLMError(`LLM streaming request failed while reading response: ${message}`);
+    }
+
+    log('info', 'LLM_STREAM_REQUEST_COMPLETE', 'LLM streaming request completed', {
+      durationMs: Date.now() - requestStartedAt,
+      requestId,
+    });
+
+    if (!receivedAnyContent) {
+      throw new LLMError('LLM API returned no message content');
+    }
+  }
+
+  private chatCompletionsUrl(): string {
+    return `${this.options.baseUrl.replace(/\/+$/, '')}/chat/completions`;
+  }
+
+  private buildHeaders(): Record<string, string> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    // Use OAuth2 token if available, otherwise fall back to apiKey
+    if (this.oauthToken) {
+      headers.Authorization = `Bearer ${this.oauthToken}`;
+    } else if (this.options.apiKey) {
+      headers.Authorization = `Bearer ${this.options.apiKey}`;
+    }
+    return headers;
+  }
+
+  private buildMessages(prompt: string): Array<{ content: string; role: string }> {
+    const systemPrompt = this.options.systemPrompt ?? renderPrompt('answer.systemPrompt', {});
+    return [
+      { content: systemPrompt, role: 'system' },
+      { content: prompt, role: 'user' },
+    ];
+  }
+
+  private clearOAuthTokenOn401(status: number): void {
+    if (status === 401 && this.isOAuth2Configured()) {
+      this.oauthToken = undefined;
+      this.tokenExpiry = undefined;
+    }
+  }
+}
+
+/**
+ * Parses an OpenAI-compatible `text/event-stream` chat-completions response
+ * body into a stream of text deltas, skipping non-`data:` lines and the
+ * terminal `[DONE]` sentinel.
+ */
+async function* parseSseDeltas(body: ReadableStream<Uint8Array>): AsyncGenerator<string, void, unknown> {
+  const decoder = new TextDecoder();
+  let buffer = '';
+  for await (const rawChunk of body) {
+    buffer += decoder.decode(rawChunk as Uint8Array, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data:')) continue;
+      const data = trimmed.slice('data:'.length).trim();
+      if (data === '[DONE]' || data === '') continue;
+      let parsed: ChatCompletionChunk;
+      try {
+        parsed = JSON.parse(data) as ChatCompletionChunk;
+      } catch {
+        continue;
+      }
+      const content = parsed.choices?.[0]?.delta?.content;
+      if (content) yield content;
     }
   }
 }
