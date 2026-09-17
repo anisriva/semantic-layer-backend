@@ -1,0 +1,156 @@
+### Repository API Requests
+### Base URL: http://localhost:3000/api/v1
+###
+### NOTE: Git integration is deferred to a dedicated later phase (see
+### artifacts/new/2-phased-development-plan.md). Until then, repositories
+### are created with sourceType "LOCAL" and a `localPath` that must already
+### exist on disk and be readable by the worker process. `sourceType: "GIT"`
+### is accepted by the schema but rejected by the API today.
+
+#############################################
+# Variables
+#############################################
+
+@repository_id = 0ac612d7-fd46-49ee-a971-d91cef5fb7ef
+@job_id = 63952a94-a898-4311-b8d1-feec8056186d
+
+#############################################
+# Repository CRUD Operations
+#############################################
+
+### Create a new repository (LOCAL source - supported today)
+### API/worker run directly on the host (npm run dev:api / dev:worker), so
+### localPath is any path readable on the host — no container path mapping.
+POST http://localhost:3000/api/v1/repositories
+Content-Type: application/json
+
+{
+  "sourceType": "LOCAL",
+  "localPath": "/Users/4275019/repos/work/ecp/erpc-pivot-platform-v1",
+  "name": "Example Repository",
+  "description": "An example repository for testing"
+}
+
+### Create a new repository (GIT source - not yet supported, returns an error until Git Integration phase)
+POST http://localhost:3000/api/v1/repositories
+Content-Type: application/json
+
+{
+  "sourceType": "GIT",
+  "gitUrl": "https://github.com/example/repo.git",
+  "name": "Example Repository",
+  "description": "An example repository for testing"
+}
+
+### List all repositories
+GET http://localhost:3000/api/v1/repositories
+
+### List repositories with status filter
+GET http://localhost:3000/api/v1/repositories?status=READY
+
+### List repositories with pagination
+GET http://localhost:3000/api/v1/repositories?limit=10&offset=0
+
+### Get a specific repository by ID
+GET http://localhost:3000/api/v1/repositories/{{repository_id}}
+
+### Update repository metadata
+PUT http://localhost:3000/api/v1/repositories/{{repository_id}}
+Content-Type: application/json
+
+{
+  "name": "Updated Repository Name",
+  "description": "Updated description"
+}
+
+### Delete a repository
+DELETE http://localhost:3000/api/v1/repositories/{{repository_id}}
+
+#############################################
+# Repository Operations
+#############################################
+
+### Trigger a repository refresh (LOCAL source - commitHead is optional, auto-generated if omitted)
+### For LOCAL/full-scan refreshes, the worker deletes and recreates the
+### repository's Qdrant collection before re-indexing (src/helpers/collection-reset.ts),
+### so stale chunks from renamed/deleted files never linger. Look for a
+### COLLECTION_RESET step in GET /jobs/:id/audit to confirm this ran.
+POST http://localhost:3000/api/v1/repositories/{{repository_id}}/refresh
+Content-Type: application/json
+
+{}
+
+### Trigger a repository refresh (GIT source - commitHead required, once Git Integration lands)
+POST http://localhost:3000/api/v1/repositories/{{repository_id}}/refresh
+Content-Type: application/json
+
+{
+  "commitHead": "abc123def456"
+}
+
+### List jobs for a repository
+GET http://localhost:3000/api/v1/repositories/{{repository_id}}/jobs
+
+### List jobs for a repository with status filter
+GET http://localhost:3000/api/v1/repositories/{{repository_id}}/jobs?status=completed
+
+### List jobs for a repository with type filter
+GET http://localhost:3000/api/v1/repositories/{{repository_id}}/jobs?type=INDEX
+
+### List jobs for a repository with pagination
+GET http://localhost:3000/api/v1/repositories/{{repository_id}}/jobs?limit=10&offset=0
+
+#############################################
+# Job Operations
+#############################################
+
+### Get a specific job by ID
+GET http://localhost:3000/api/v1/jobs/{{job_id}}
+
+### Get audit logs for a job
+GET http://localhost:3000/api/v1/jobs/{{job_id}}/audit
+
+#############################################
+# Example Workflow
+#############################################
+
+### Step 1: Create a repository
+# @name createRepo
+POST http://localhost:3000/api/v1/repositories
+Content-Type: application/json
+
+{
+  "sourceType": "LOCAL",
+  "localPath": "/Users/4275019/repos/work/misc/semantic-layer/semantic-code/backend",
+  "name": "Test Repository",
+  "description": "Test repository for Phase 2"
+}
+
+### Step 2: Get the created repository ID from response
+# @name getRepoId
+GET http://localhost:3000/api/v1/repositories/{{createRepo.response.body.$.id}}
+
+### Step 3: Trigger a refresh (full re-scan; delta detection arrives with Git Integration)
+POST http://localhost:3000/api/v1/repositories/{{createRepo.response.body.$.id}}/refresh
+Content-Type: application/json
+
+{}
+
+### Step 4: Check repository status
+GET http://localhost:3000/api/v1/repositories/{{createRepo.response.body.$.id}}
+
+### Step 5: List jobs for the repository
+GET http://localhost:3000/api/v1/repositories/{{createRepo.response.body.$.id}}/jobs
+
+### Step 6: Get job details and audit logs
+# Replace {{job_id}} with an actual job ID from the previous response
+GET http://localhost:3000/api/v1/jobs/{{job_id}}
+
+### Step 7: Get audit logs for the job (step-level milestones, once completed)
+GET http://localhost:3000/api/v1/jobs/{{job_id}}/audit
+
+### Step 8: Stream live logs while the job is processing (SSE)
+### REST Client renders SSE as a growing response body; for a real UI, use
+### EventSource / fetch+ReadableStream against this URL instead.
+GET http://localhost:3000/api/v1/jobs/{{job_id}}/logs
+Accept: text/event-stream

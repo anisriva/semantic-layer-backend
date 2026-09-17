@@ -1,0 +1,127 @@
+### Job API Requests
+### Base URL: http://localhost:3000/api/v1
+
+#############################################
+# Variables
+#############################################
+
+@job_id = <replace-with-actual-job-id>
+
+#############################################
+# Job Operations
+#############################################
+
+### Get a specific job by ID
+GET http://localhost:3000/api/v1/jobs/{{job_id}}
+
+### Get audit logs for a job (structured, step-level milestones)
+GET http://localhost:3000/api/v1/jobs/{{job_id}}/audit
+
+### Stream raw log lines for a job in real time (SSE)
+### Use this while a job is `pending`/`processing` to tail progress in a UI;
+### once a job reaches a terminal status, GET /audit is the right endpoint
+### for structured metrics instead of re-reading the raw log.
+GET http://localhost:3000/api/v1/jobs/{{job_id}}/logs
+Accept: text/event-stream
+
+#############################################
+# Job Monitoring Examples
+#############################################
+
+### Monitor a specific job's progress
+# 1. Get job details
+GET http://localhost:3000/api/v1/jobs/{{job_id}}
+
+# 2. While pending/processing: stream live output
+GET http://localhost:3000/api/v1/jobs/{{job_id}}/logs
+Accept: text/event-stream
+
+# 3. Once completed/failed: get audit logs for structured metrics
+GET http://localhost:3000/api/v1/jobs/{{job_id}}/audit
+
+# Expected job statuses: pending, processing, completed, failed
+
+#############################################
+# GET /jobs/:id/logs (SSE) — Frame Reference
+#############################################
+
+### Event frame format:
+#   event: log
+#   data: {"id","job_id","level":"info"|"warn"|"error","message","created_at"}
+#
+#   event: done
+#   data: {"status": "completed" | "failed"}
+#
+# Behavior:
+# - On connect, replays every JobLog row recorded so far as `event: log` frames.
+# - If the job is already completed/failed, sends `event: done` and closes immediately.
+# - Otherwise polls every `app.worker.logStreamPollIntervalMs` (default 1000ms)
+#   for new lines and job-status changes, streaming new `event: log` frames,
+#   until the job reaches a terminal state (`event: done`, connection closes)
+#   or the client disconnects.
+# - Backing store: the `JobLog` table, populated by the worker's
+#   `withJobLogCapture` (src/helpers/job-log-capture.ts), which tees every
+#   console.log/warn/error made while processing that job — including deep
+#   inside IndexingService — without those modules needing DB access.
+
+#############################################
+# Common Audit Log Steps
+#############################################
+
+### Typical audit log steps for INDEX jobs:
+# - JOB_CLAIM: Worker claimed the job
+# - SCAN: File scanning completed
+# - INITIALIZE_PROVIDERS: LLM and vector store initialization
+# - PROCESS_FILES: File processing and chunking
+# - BUILD_GRAPH: Dependency graph construction
+# - INDEXING: Overall indexing process
+# - JOB_COMPLETE: Job finished successfully
+# - JOB_FAILED: Job failed (if error occurred)
+
+### Typical audit log steps for REFRESH jobs (current, full-scan):
+# - JOB_CLAIM: Worker claimed the job
+# - COLLECTION_RESET: Qdrant collection dropped before the full re-scan
+#   (src/helpers/collection-reset.ts), so stale chunks from files removed
+#   or renamed on disk since the last run cannot linger.
+# - REFRESH: Refresh process (full-scan today for every source type)
+# - JOB_COMPLETE: Job finished successfully
+# - JOB_FAILED: Job failed (if error occurred)
+
+### Typical audit log steps for REFRESH jobs (once Git Integration + Delta-Aware
+### Refresh phases land — GIT-sourced repositories only; LOCAL repositories
+### keep doing the full-scan + COLLECTION_RESET behavior above indefinitely):
+# - JOB_CLAIM: Worker claimed the job
+# - DELTA_DETECTION: Git diff and change analysis
+# - SCAN: Delta file scanning
+# - INITIALIZE_PROVIDERS: LLM and vector store initialization
+# - PROCESS_FILES: Changed file processing
+# - BUILD_GRAPH: Dependency graph construction
+# - INDEXING: Overall indexing process
+# - JOB_COMPLETE: Job finished successfully
+# - JOB_FAILED: Job failed (if error occurred)
+
+#############################################
+# Job Status Examples
+#############################################
+
+### Example: Check if a job completed successfully
+GET http://localhost:3000/api/v1/jobs/{{job_id}}
+
+# Look for:
+# - status: "completed" (success) or "failed" (error)
+# - completed_at: timestamp when job finished
+# - error_message: null (success) or error text (failure)
+# - retry_count: number of retry attempts
+
+### Example: Get detailed metrics from audit logs
+GET http://localhost:3000/api/v1/jobs/{{job_id}}/audit
+
+# Look for metrics in completed audit log entries:
+# - SCAN: { fileCount, durationMs }
+# - INITIALIZE_PROVIDERS: { embeddingModel, enrichmentModel, existingPoints }
+# - PROCESS_FILES: { successfulFiles, failedFiles, totalFiles, durationMs, totalChunks, enrichedChunks }
+# - BUILD_GRAPH: { graphNodeCount, graphEdgeCount }
+# - COLLECTION_RESET: { collectionName }
+# - INDEXING: { chunkCount, fileCount, durationMs, graphNodeCount, graphEdgeCount }
+# - REFRESH: { chunkCount, fileCount, durationMs, graphNodeCount, graphEdgeCount }
+# - DELTA_DETECTION: { changedFiles, chunksToCreate, chunksToDelete, chunksToReindex, deltaDetectionTimeMs }
