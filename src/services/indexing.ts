@@ -3,9 +3,8 @@
  *
  * Given a filesystem root and a target collection name, runs the full
  * local ingestion pipeline (scan -> parse/chunk -> graph -> enrich ->
- * embed/index) and reports pipeline metrics. Owns no persistence beyond the
- * Qdrant/BM25 index it writes to. Phase 1: no Postgres/job dependency (see
- * Phase 2 notes in `artifacts/new/1-architecture-and-setup.md`).
+ * embed/index) and reports pipeline metrics. Phase 2: supports optional
+ * job context for audit logging through PostgreSQL.
  *
  * Concurrency Model:
  * - Uses p-limit for async I/O concurrency control (not multi-core threading)
@@ -23,6 +22,8 @@ import {
   type FullAppConfig,
 } from '@/config/index.js';
 import type { Chunk, ScannedFile, ParsedFile } from '@/helpers/core/index.js';
+import { PipelineStage, MetricsType, ScanType } from '@/types/audit.js';
+import type { AuditLogDao } from '@/daos/audit-log.js';
 import { scanFiles } from '@/helpers/file-scanner.js';
 import { enrichChunks } from '@/helpers/chunk-enrichment.js';
 import { indexChunks, initializeVectorStore } from '@/helpers/chunk-indexer.js';
@@ -33,6 +34,14 @@ export interface IndexPathOptions {
   excludePatterns?: string[];
   /** Pre-built documentation chunks (e.g. from Confluence) merged in alongside source chunks. */
   documentationChunks?: Chunk[];
+  /** Optional job context for Phase 2 audit logging */
+  jobId?: string;
+  /** Optional audit log DAO for Phase 2 integration */
+  auditLogDao?: AuditLogDao;
+  /** Optional user ID for user attribution */
+  userId?: string;
+  /** Optional scan type (FULL vs DIFF) */
+  scanType?: ScanType;
 }
 
 export interface IndexResult {
@@ -78,6 +87,15 @@ export class IndexingService {
     const documentationChunks = options.documentationChunks ?? [];
     const ingestionConfig = getIngestionConfig(this.fullConfig);
     const excludePatterns = options.excludePatterns ?? ingestionConfig.excludePatterns;
+    const jobId = options.jobId;
+    const auditLogDao = options.auditLogDao;
+
+    // Record scan start with performance metrics type
+    if (jobId && auditLogDao) {
+      await auditLogDao.createStartedForJob(jobId, PipelineStage.SCAN_FILES, MetricsType.PERFORMANCE, {
+        userId: options.userId,
+      });
+    }
 
     // ============================================
     // STAGE 1: Scan files
@@ -87,7 +105,25 @@ export class IndexingService {
     try {
       files = await scanFiles(rootPath, { excludePatterns });
       console.log(`[Indexing] Scan complete: ${files.length} files found`);
+
+      // Record scan completion with performance metrics
+      if (jobId && auditLogDao) {
+        const scanDurationMs = Date.now() - startedAt;
+        await auditLogDao.createCompletedWithPerformanceForJob(jobId, PipelineStage.SCAN_FILES, {
+          duration_ms: scanDurationMs,
+          scan_file_count: files.length,
+          scan_duration_ms: scanDurationMs,
+          scan_files_per_second: files.length / (scanDurationMs / 1000),
+        }, {
+          userId: options.userId,
+        });
+      }
     } catch (error) {
+      if (jobId && auditLogDao) {
+        await auditLogDao.createFailedForJob(jobId, PipelineStage.SCAN_FILES, MetricsType.PERFORMANCE, {
+          userId: options.userId,
+        });
+      }
       throw new IndexingError('scan', error);
     }
 
@@ -107,11 +143,21 @@ export class IndexingService {
     // STAGE 2: Initialize providers and helpers
     // ============================================
     console.log('[Indexing] Initializing LLM and indexing providers...');
+
+    const initializationStartedAt = Date.now();
+
+    // Record audit log for initialization
+    if (jobId && auditLogDao) {
+      await auditLogDao.createStartedForJob(jobId, PipelineStage.INITIALIZE_PROVIDERS, MetricsType.PERFORMANCE, {
+        userId: options.userId,
+      });
+    }
+
     const embeddingConfig = getEmbeddingModelConfig(this.fullConfig);
     const enrichmentConfig = getEnrichmentModelConfig(this.fullConfig);
     console.log(`[Indexing] Embedding model: ${embeddingConfig.model} (${embeddingConfig.baseUrl})`);
     console.log(`[Indexing] Enrichment model: ${enrichmentConfig.model} (${enrichmentConfig.baseUrl})`);
-    
+
     const enrichmentLlm = createEnrichmentLlm(this.fullConfig);
     const { embeddingProvider, vectorStore, bm25Index } = createCollectionProviders(
       collectionName,
@@ -126,7 +172,22 @@ export class IndexingService {
       } else {
         console.log(`[Indexing] Vector store ready with ${count.value} existing points`);
       }
+
+      // Record audit log for initialization completion
+      if (jobId && auditLogDao) {
+        const initializationDurationMs = Date.now() - initializationStartedAt;
+        await auditLogDao.createCompletedWithPerformanceForJob(jobId, PipelineStage.INITIALIZE_PROVIDERS, {
+          duration_ms: initializationDurationMs,
+        }, {
+          userId: options.userId,
+        });
+      }
     } catch (error) {
+      if (jobId && auditLogDao) {
+        await auditLogDao.createFailedForJob(jobId, PipelineStage.INITIALIZE_PROVIDERS, MetricsType.PERFORMANCE, {
+          userId: options.userId,
+        });
+      }
       vectorStore.close();
       throw new IndexingError('initialize-vector-store', error);
     }
@@ -134,6 +195,15 @@ export class IndexingService {
     // ============================================
     // STAGE 3: Process files incrementally with concurrency
     // ============================================
+    const processingStartedAt = Date.now();
+
+    // Record audit log for processing start
+    if (jobId && auditLogDao) {
+      await auditLogDao.createStartedForJob(jobId, PipelineStage.PARSE_FILES, MetricsType.PERFORMANCE, {
+        userId: options.userId,
+      });
+    }
+    
     // Cap concurrency at the number of files to avoid unnecessary overhead
     const effectiveConcurrency = Math.min(ingestionConfig.concurrency, files.length);
     console.log(`[Indexing] Starting concurrent processing of ${files.length} files with file concurrency ${ingestionConfig.concurrency} (effective: ${effectiveConcurrency}) and enrichment concurrency ${ingestionConfig.enrichmentConcurrency}`);
@@ -231,12 +301,39 @@ export class IndexingService {
       console.warn(`[Indexing] ${failedCount} files failed to process out of ${files.length} total`);
     }
 
-    const processingDuration = Date.now() - startedAt;
+    const processingDuration = Date.now() - processingStartedAt;
     console.log(`[Indexing] File processing summary: ${processedCount - failedCount}/${files.length} successful, ${failedCount} failed in ${processingDuration}ms`);
+
+    // Record audit log for processing completion
+    if (jobId && auditLogDao) {
+      await auditLogDao.createCompletedWithPerformanceForJob(jobId, PipelineStage.PARSE_FILES, {
+        duration_ms: processingDuration,
+        files_processed: processedCount - failedCount,
+        chunks_generated: totalChunks.length,
+        files_per_second: (processedCount - failedCount) / (processingDuration / 1000),
+        chunks_per_second: totalChunks.length / (processingDuration / 1000),
+        processing_successful_files: processedCount - failedCount,
+        processing_failed_files: failedCount,
+        processing_total_files: files.length,
+        processing_duration_ms: processingDuration,
+        processing_success_rate: (processedCount - failedCount) / files.length,
+      }, {
+        userId: options.userId,
+      });
+    }
 
     // Process documentation chunks if provided
     if (documentationChunks.length > 0) {
       console.log(`[Indexing] Processing ${documentationChunks.length} documentation chunks...`);
+
+      const documentationStartedAt = Date.now();
+
+      // Record audit log for documentation processing
+      if (jobId && auditLogDao) {
+        await auditLogDao.createStartedForJob(jobId, PipelineStage.PROCESS_DOCUMENTATION, MetricsType.PERFORMANCE, {
+          userId: options.userId,
+        });
+      }
 
       try {
         const enrichedDocChunks = await enrichChunks(documentationChunks, enrichmentLlm, enrichmentLimit, enrichmentConfig.model);
@@ -245,7 +342,24 @@ export class IndexingService {
 
         await indexChunks(enrichedDocChunks, embeddingProvider, vectorStore, bm25Index, embeddingLimit, embeddingConfig.model);
         console.log(`[Indexing] → Indexed ${enrichedDocChunks.length} documentation chunks`);
+
+        // Record audit log for documentation processing completion
+        if (jobId && auditLogDao) {
+          const documentationDurationMs = Date.now() - documentationStartedAt;
+          await auditLogDao.createCompletedWithPerformanceForJob(jobId, PipelineStage.PROCESS_DOCUMENTATION, {
+            duration_ms: documentationDurationMs,
+            files_processed: 0,
+            chunks_generated: documentationChunks.length,
+          }, {
+            userId: options.userId,
+          });
+        }
       } catch (error) {
+        if (jobId && auditLogDao) {
+          await auditLogDao.createFailedForJob(jobId, PipelineStage.PROCESS_DOCUMENTATION, MetricsType.PERFORMANCE, {
+            userId: options.userId,
+          });
+        }
         throw new IndexingError('enrich', error);
       }
     }
@@ -254,13 +368,48 @@ export class IndexingService {
     // STAGE 4: Build dependency graph
     // ============================================
     console.log('[Indexing] Building dependency graph...');
+
+    const graphStartedAt = Date.now();
+
+    // Record audit log for graph building
+    if (jobId && auditLogDao) {
+      await auditLogDao.createStartedForJob(jobId, PipelineStage.BUILD_GRAPH, MetricsType.PERFORMANCE, {
+        userId: options.userId,
+      });
+    }
+
     if (files.length > 0) {
       try {
         const graphData = await this.buildGraph(rootPath, files);
         graphNodeCount = graphData.graphNodeCount;
         graphEdgeCount = graphData.graphEdgeCount;
-        console.log(`[Indexing] Graph built: ${graphNodeCount} nodes, ${graphEdgeCount} edges`);
+        const graphDurationMs = Date.now() - graphStartedAt;
+
+        // Calculate graph density: 2 * edges / (nodes * (nodes - 1))
+        const graphDensity = graphNodeCount > 1
+          ? (2 * graphEdgeCount) / (graphNodeCount * (graphNodeCount - 1))
+          : 0;
+
+        console.log(`[Indexing] Graph built: ${graphNodeCount} nodes, ${graphEdgeCount} edges, density: ${graphDensity.toFixed(4)}`);
+
+        // Record audit log for graph building completion
+        if (jobId && auditLogDao) {
+          await auditLogDao.createCompletedWithPerformanceForJob(jobId, PipelineStage.BUILD_GRAPH, {
+            duration_ms: graphDurationMs,
+            graph_node_count: graphNodeCount,
+            graph_edge_count: graphEdgeCount,
+            graph_duration_ms: graphDurationMs,
+            graph_density: graphDensity,
+          }, {
+            userId: options.userId,
+          });
+        }
       } catch (error) {
+        if (jobId && auditLogDao) {
+          await auditLogDao.createFailedForJob(jobId, PipelineStage.BUILD_GRAPH, MetricsType.PERFORMANCE, {
+            userId: options.userId,
+          });
+        }
         throw new IndexingError('graph', error);
       }
     }

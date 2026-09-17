@@ -1,4 +1,4 @@
-import { ConversationDao, MessageDao, RepositoryDao } from '@/daos/index.js';
+import { ConversationDao, MessageDao, RepositoryDao, AuditLogDao } from '@/daos/index.js';
 import { ChatService, type ChatAnswer } from '@/services/chat.js';
 import type { Conversation, Message, MessageRole } from '@prisma/client';
 
@@ -43,6 +43,7 @@ export class ConversationService {
     private readonly messageDao: MessageDao = new MessageDao(),
     private readonly repositoryDao: RepositoryDao = new RepositoryDao(),
     private readonly chatService: ChatService = new ChatService(),
+    private readonly auditLogDao: AuditLogDao = new AuditLogDao(),
   ) {}
 
   /**
@@ -189,10 +190,16 @@ export class ConversationService {
       content: question,
     });
 
-    // Generate answer using ChatService
+    // Generate answer using ChatService, attributing the CHAT audit trail
+    // (RETRIEVAL / CHAT_COMPLETION) to this conversation and user message.
     let answer: ChatAnswer;
     try {
-      answer = await this.chatService.ask(collectionName, question);
+      answer = await this.chatService.ask(collectionName, question, {
+        conversationId,
+        messageId: userMessage.id,
+        userId: conversation.user_id,
+        auditLogDao: this.auditLogDao,
+      });
     } catch (error) {
       // If chat fails, still persist the user message but throw the error
       throw error;
@@ -239,13 +246,18 @@ export class ConversationService {
     }
 
     // Persist user message immediately
-    await this.addUserMessage({
+    const userMessage = await this.addUserMessage({
       conversationId,
       role: 'user',
       content: question,
     });
 
-    const { textStream } = await this.chatService.askStream(collectionName, question);
+    const { textStream } = await this.chatService.askStream(collectionName, question, {
+      conversationId,
+      messageId: userMessage.id,
+      userId: conversation.user_id,
+      auditLogDao: this.auditLogDao,
+    });
 
     let fullAnswer = '';
     try {
