@@ -4,6 +4,8 @@ Express + TypeScript backend service for semantic code analysis and RAG implemen
 
 ## Architecture
 
+![Architecture Diagram](docs/arch.png)
+
 ### Layer Responsibilities
 
 - **Services** (`src/services/`): Orchestrators that tell WHAT to do
