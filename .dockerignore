@@ -1,0 +1,14 @@
+node_modules
+dist
+build
+.git
+.env
+.env.local
+.env.*.local
+.helpers
+coverage
+.nyc_output
+tmp
+temp
+*.log
+.DS_Store
