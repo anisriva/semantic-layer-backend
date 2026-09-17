@@ -4,3 +4,4 @@ export { ChatService, ChatGenerationError, type ChatAnswer, type ChatStreamAnswe
 export { RepositoryService, type CreateRepositoryData, type RepositoryWithDetails } from './repository.js';
 export { JobQueueService, type JobWithDetails } from './job-queue.js';
 export { ConversationService, type CreateConversationData, type CreateMessageData, type ConversationWithDetails, type MessageWithConversation } from './conversation.js';
+export { AuditService, type AuditLogQueryOptions } from './audit.js';

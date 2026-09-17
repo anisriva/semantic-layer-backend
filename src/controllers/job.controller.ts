@@ -31,25 +31,7 @@ export class JobController {
     }
   }
 
-  /**
-   * GET /api/v1/jobs/:id/audit
-   * Gets audit logs for a job.
-   */
-  async getJobAuditLogs(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const { id } = req.params;
-      if (!id) {
-        res.status(400).json({ error: 'Job ID is required' });
-        return;
-      }
-      const jobId: string = Array.isArray(id) ? (id[0] ?? '') : id;
-      const auditLogs = await this.jobQueueService.getJobAuditLogs(jobId);
 
-      res.json(auditLogs);
-    } catch (error) {
-      next(error);
-    }
-  }
 
   /**
    * GET /api/v1/repositories/:id/jobs

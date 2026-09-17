@@ -203,13 +203,6 @@ export class JobQueueService {
   }
 
   /**
-   * Gets audit logs for a job.
-   */
-  async getJobAuditLogs(jobId: string) {
-    return this.auditLogDao.findByJob(jobId);
-  }
-
-  /**
    * Gets raw console-output log lines for a job (see `JobLog`/`job-log-capture.ts`),
    * optionally only those created after `afterId` — used to tail a job's
    * progress via `GET /api/v1/jobs/:id/logs` (SSE).

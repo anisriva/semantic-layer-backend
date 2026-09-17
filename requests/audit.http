@@ -1,0 +1,132 @@
+### Audit API Requests
+### Base URL: http://localhost:3000/api/v1
+### Audit logs are immutable - these are read-only endpoints
+
+#############################################
+# Variables
+#############################################
+
+@job_id = <replace-with-actual-job-id>
+@conversation_id = <replace-with-actual-conversation-id>
+
+#############################################
+# Job Audit Operations
+#############################################
+
+### Get all audit logs for a job
+GET http://localhost:3000/api/v1/audit/{{job_id}}/jobs
+
+### Get audit logs for a job with pagination
+GET http://localhost:3000/api/v1/audit/{{job_id}}/jobs?limit=50&offset=0
+
+### Get audit logs for a job filtered by stage
+GET http://localhost:3000/api/v1/audit/{{job_id}}/jobs?stage=SCAN
+
+### Get audit logs for a job filtered by metrics type
+GET http://localhost:3000/api/v1/audit/{{job_id}}/jobs?metricsType=PERFORMANCE
+
+### Get audit logs for a job with all filters
+GET http://localhost:3000/api/v1/audit/{{job_id}}/jobs?stage=PROCESS_FILES&metricsType=PERFORMANCE&limit=100&offset=0
+
+#############################################
+# Conversation Audit Operations
+#############################################
+
+### Get all audit logs for a conversation
+GET http://localhost:3000/api/v1/audit/{{conversation_id}}/conversations
+
+### Get audit logs for a conversation with pagination
+GET http://localhost:3000/api/v1/audit/{{conversation_id}}/conversations?limit=50&offset=0
+
+### Get audit logs for a conversation filtered by stage
+GET http://localhost:3000/api/v1/audit/{{conversation_id}}/conversations?stage=RETRIEVAL
+
+### Get audit logs for a conversation filtered by metrics type
+GET http://localhost:3000/api/v1/audit/{{conversation_id}}/conversations?metricsType=COST
+
+### Get audit logs for a conversation with all filters
+GET http://localhost:3000/api/v1/audit/{{conversation_id}}/conversations?stage=CHAT_COMPLETION&metricsType=COST&limit=100&offset=0
+
+#############################################
+# Query Parameters Reference
+#############################################
+
+### Available query parameters:
+# - stage: Filter by pipeline stage (e.g., SCAN, PROCESS_FILES, RETRIEVAL, CHAT_COMPLETION)
+# - metricsType: Filter by metrics type (PERFORMANCE, COST, RESOURCE, QUALITY, BUSINESS)
+# - limit: Maximum number of results to return (pagination)
+# - offset: Number of results to skip (pagination)
+
+### Example: Paginate through large audit logs
+# First page (first 50 records)
+GET http://localhost:3000/api/v1/audit/{{job_id}}/jobs?limit=50&offset=0
+
+# Second page (next 50 records)
+GET http://localhost:3000/api/v1/audit/{{job_id}}/jobs?limit=50&offset=50
+
+# Third page (next 50 records)
+GET http://localhost:3000/api/v1/audit/{{job_id}}/jobs?limit=50&offset=100
+
+#############################################
+# Common Pipeline Stages
+#############################################
+
+### Job pipeline stages:
+# - JOB_CLAIM: Worker claimed the job
+# - SCAN: File scanning completed
+# - INITIALIZE_PROVIDERS: LLM and vector store initialization
+# - PROCESS_FILES: File processing and chunking
+# - BUILD_GRAPH: Dependency graph construction
+# - INDEXING: Overall indexing process
+# - JOB_COMPLETE: Job finished successfully
+# - JOB_FAILED: Job failed (if error occurred)
+# - JOB_RETRY: Job reset for retry
+
+### Conversation pipeline stages:
+# - RETRIEVAL: Document retrieval process
+# - CHAT_COMPLETION: LLM chat completion process
+
+#############################################
+# Metrics Types Reference
+#############################################
+
+### Available metrics types:
+# - PERFORMANCE: Performance metrics (duration, throughput, counts)
+# - COST: Cost metrics (tokens, costs, model usage)
+# - RESOURCE: Resource metrics (memory, CPU, storage)
+# - QUALITY: Quality metrics (accuracy, relevance scores)
+# - BUSINESS: Business metrics (user engagement, outcomes)
+
+### Example: Get only performance metrics for a job
+GET http://localhost:3000/api/v1/audit/{{job_id}}/jobs?metricsType=PERFORMANCE
+
+### Example: Get only cost metrics for a conversation
+GET http://localhost:3000/api/v1/audit/{{conversation_id}}/conversations?metricsType=COST
+
+#############################################
+# Response Format
+#############################################
+
+### Audit log response structure:
+# {
+#   "id": "string",
+#   "operation_type": "JOB" | "CHAT",
+#   "job_id": "string | null",
+#   "conversation_id": "string | null",
+#   "message_id": "string | null",
+#   "stage": "PIPELINE_STAGE",
+#   "status": "IN_PROGRESS" | "COMPLETED" | "FAILED",
+#   "metrics_type": "PERFORMANCE" | "COST" | "RESOURCE" | "QUALITY" | "BUSINESS",
+#   "started_at": "datetime",
+#   "completed_at": "datetime | null",
+#   "user_id": "string | null",
+#   "worker_id": "string | null",
+#   "performance_metrics": { ... } | null,
+#   "cost_metrics": { ... } | null,
+#   "resource_metrics": { ... } | null,
+#   "quality_metrics": { ... } | null,
+#   "business_metrics": { ... } | null
+# }
+
+### Note: Only the metrics type specified in the query will be populated
+### in the response. Other metrics fields will be null.

@@ -43,6 +43,7 @@ export type CreateAuditLogData = Omit<
   job_id?: string | null;
   conversation_id?: string | null;
   message_id?: string | null;
+  stage: PipelineStage; // Required field
 };
 
 /**

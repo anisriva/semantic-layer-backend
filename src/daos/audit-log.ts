@@ -435,7 +435,8 @@ export class AuditLogDao {
    */
   async findByJobAndMetricsType(
     jobId: string,
-    metricsType: MetricsType
+    metricsType: MetricsType,
+    options?: { limit?: number; offset?: number }
   ): Promise<AuditLogWithMetrics[]> {
     return prisma.auditLog.findMany({
       where: {
@@ -443,6 +444,8 @@ export class AuditLogDao {
         metrics_type: metricsType,
       },
       orderBy: { started_at: 'asc' },
+      take: options?.limit,
+      skip: options?.offset,
       include: {
         // Include the specific metrics based on type
         ...(metricsType === MetricsType.PERFORMANCE && { performance_metrics: true }),
@@ -521,20 +524,51 @@ export class AuditLogDao {
   /**
    * Finds audit logs for a job (legacy method for backward compatibility)
    */
-  async findByJob(jobId: string): Promise<AuditLog[]> {
+  async findByJob(jobId: string, options?: { limit?: number; offset?: number }): Promise<AuditLog[]> {
     return prisma.auditLog.findMany({
       where: { job_id: jobId },
       orderBy: { started_at: 'asc' },
+      take: options?.limit,
+      skip: options?.offset,
+    });
+  }
+
+  /**
+   * Finds audit logs for a conversation with specific metrics type
+   */
+  async findByConversationAndMetricsType(
+    conversationId: string,
+    metricsType: MetricsType,
+    options?: { limit?: number; offset?: number }
+  ): Promise<AuditLogWithMetrics[]> {
+    return prisma.auditLog.findMany({
+      where: {
+        conversation_id: conversationId,
+        metrics_type: metricsType,
+      },
+      orderBy: { started_at: 'asc' },
+      take: options?.limit,
+      skip: options?.offset,
+      include: {
+        // Include the specific metrics based on type
+        ...(metricsType === MetricsType.PERFORMANCE && { performance_metrics: true }),
+        ...(metricsType === MetricsType.COST && { cost_metrics: true }),
+        ...(metricsType === MetricsType.RESOURCE && { resource_metrics: true }),
+        ...(metricsType === MetricsType.QUALITY && { quality_metrics: true }),
+        ...(metricsType === MetricsType.BUSINESS && { business_metrics: true }),
+      },
     });
   }
 
   /**
    * Finds audit logs for a conversation.
    */
-  async findByConversation(conversationId: string): Promise<AuditLog[]> {
+  async findByConversation(conversationId: string, options?: { limit?: number; offset?: number }): Promise<AuditLog[]> {
     return prisma.auditLog.findMany({
       where: { conversation_id: conversationId },
       orderBy: { started_at: 'asc' },
+      take: options?.limit,
+      skip: options?.offset,
     });
   }
 
