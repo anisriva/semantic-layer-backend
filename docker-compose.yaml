@@ -49,7 +49,46 @@ services:
     environment:
       - POSTGRES_DB=semantic_layer
       - POSTGRES_USER=semantic_user
-      # ADD POSTGRES_PASSWORD for dev
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    restart: unless-stopped
+
+  # API server and worker are run manually for now (`npm run dev:api` /
+  # `npm run dev:worker` against the host .env, which already points at
+  # localhost:5432/6333/11434 — see requests/README.md). Left here,
+  # commented out, as the ready-to-use definition for when they're moved
+  # back into compose (Dockerfile/.env.docker/.env.docker.example already
+  # exist for that): uncomment both blocks and run
+  # `podman-compose up -d --build api worker`.
+  #
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: semantic-code-api
+    command: ["node", "dist/src/api-server.js"]
+    ports:
+      - "3000:3000"
+    volumes:
+      - ${ENV_FILE:-./.env.docker}:/app/.env:ro
+      - ${REPO_WORKSPACE:-./workspace}:/workspace
+    depends_on:
+      - postgres
+      - qdrant
+    restart: unless-stopped
+  
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["node", "dist/src/worker.js"]
+    deploy:
+      replicas: 1
+    volumes:
+      - ${ENV_FILE:-./.env.docker}:/app/.env:ro
+      - ${REPO_WORKSPACE:-./workspace}:/workspace
+    depends_on:
+      - postgres
+      - qdrant
     restart: unless-stopped
 
 volumes:
