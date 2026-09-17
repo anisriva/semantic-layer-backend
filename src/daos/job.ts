@@ -1,5 +1,5 @@
 import { prisma } from '@/connectors/database.js';
-import type { Job, JobStatus, JobType } from '@prisma/client';
+import type { Job, JobStatus, JobType, ScanType } from '@prisma/client';
 
 export class JobDao {
   /**
@@ -9,6 +9,9 @@ export class JobDao {
     repositoryId: string;
     type: JobType;
     commitHead: string;
+    triggeredBy?: string;
+    scanType?: ScanType;
+    jobMetadata?: unknown;
   }): Promise<Job> {
     return prisma.job.create({
       data: {
@@ -16,6 +19,9 @@ export class JobDao {
         type: data.type,
         commit_head: data.commitHead,
         status: 'pending',
+        triggered_by: data.triggeredBy,
+        scan_type: data.scanType,
+        job_metadata: data.jobMetadata as any,
       },
     });
   }
@@ -116,6 +122,9 @@ export class JobDao {
     }
 
     const job = result[0];
+    if (!job) {
+      return null;
+    }
 
     // Update the job to processing status with worker ID
     const updated = await prisma.job.update({
