@@ -32,13 +32,17 @@ export function loadEnvFile(filePath: string): Record<string, unknown> {
 
     for (let i = 0; i < parts.length - 1; i++) {
       const part = parts[i];
+      if (!part) continue; // Skip empty parts
       if (!(part in current) || typeof current[part] !== 'object' || current[part] === null) {
         current[part] = {};
       }
       current = current[part] as Record<string, unknown>;
     }
 
-    current[parts[parts.length - 1]] = parseEnvValue(rawValue);
+    const lastPart = parts[parts.length - 1];
+    if (lastPart) {
+      current[lastPart] = parseEnvValue(rawValue);
+    }
   }
 
   return result;
