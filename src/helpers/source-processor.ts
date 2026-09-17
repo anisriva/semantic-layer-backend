@@ -50,7 +50,9 @@ export class TextChunker {
       let currentChunkStartLine = 0;
 
       for (let i = 0; i < lines.length; i++) {
-        currentChunkLines.push(lines[i]);
+        const line = lines[i];
+        if (!line) continue;
+        currentChunkLines.push(line);
 
         // Check if we should start a new chunk
         const currentContent = currentChunkLines.join('\n');
