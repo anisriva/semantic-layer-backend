@@ -19,6 +19,9 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "ignoreDeprecations": "6.0",
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "noUncheckedIndexedAccess": true,
     "types": ["node"],
     "paths": {
       "@/*": ["./src/*"]
