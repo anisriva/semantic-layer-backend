@@ -20,6 +20,11 @@ enum RepositoryStatus {
   ERROR
 }
 
+enum RepositorySourceType {
+  LOCAL
+  GIT
+}
+
 enum RepositoryPermission {
   READ
   READ_WRITE
@@ -72,15 +77,17 @@ model User {
 }
 
 model Repository {
-  id              String           @id @default(uuid())
-  git_url         String           @unique
+  id              String               @id @default(uuid())
+  source_type     RepositorySourceType @default(LOCAL)
+  git_url         String?              @unique
+  local_path      String?
   name            String
   description     String?
-  status          RepositoryStatus @default(NOT_READY)
+  status          RepositoryStatus     @default(NOT_READY)
   last_processed_job_id String?
   owner_id        String
-  created_at      DateTime         @default(now())
-  updated_at      DateTime         @updatedAt
+  created_at      DateTime             @default(now())
+  updated_at      DateTime             @updatedAt
 
   owner              User   @relation("RepositoryOwner", fields: [owner_id], references: [id])
   last_processed_job Job?   @relation("RepositoryLastProcessedJob", fields: [last_processed_job_id], references: [id], onDelete: SetNull)
@@ -93,6 +100,7 @@ model Repository {
   @@index([git_url])
   @@index([owner_id])
   @@index([last_processed_job_id])
+  @@index([source_type])
 }
 
 model RepositoryAccess {
@@ -145,6 +153,7 @@ model Job {
   repository       Repository   @relation("RepositoryJobs", fields: [repository_id], references: [id])
   last_processed_by Repository[] @relation("RepositoryLastProcessedJob")
   audit_logs        AuditLog[]
+  job_logs          JobLog[]
 
   @@index([status, created_at])
   @@index([repository_id])
@@ -165,6 +174,31 @@ model AuditLog {
 
   @@index([job_id, step])
   @@index([status])
+}
+
+enum JobLogLevel {
+  info
+  warn
+  error
+}
+
+/**
+ * Raw, line-level console output captured while a job is processing, so a
+ * client can tail a job's progress in real time (GET /api/v1/jobs/:id/logs,
+ * SSE). Complements AuditLog, which records discrete step
+ * started/completed/failed milestones with structured metrics rather than
+ * free-form output.
+ */
+model JobLog {
+  id         String      @id @default(uuid())
+  job_id     String
+  level      JobLogLevel @default(info)
+  message    String      @db.Text
+  created_at DateTime    @default(now())
+
+  job Job @relation(fields: [job_id], references: [id])
+
+  @@index([job_id, created_at])
 }
 
 model Conversation {
