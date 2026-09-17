@@ -2,11 +2,15 @@
   "name": "backend",
   "version": "1.0.0",
   "description": "Semantic Code Backend - Clean Architecture",
-  "main": "dist/server.js",
+  "main": "dist/api-server.js",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "tsx watch src/api-server.ts",
+    "dev:api": "tsx watch src/api-server.ts",
+    "dev:worker": "tsx watch src/worker.ts",
     "build": "tsc && tsc-alias",
-    "start": "node dist/server.js",
+    "start": "node dist/api-server.js",
+    "start:api": "node dist/api-server.js",
+    "start:worker": "node dist/worker.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:db": "npx tsx src/connectors/test/test-database-connection.ts",
@@ -14,7 +18,11 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "prisma:push": "prisma db push",
-    "prisma:format": "prisma format"
+    "prisma:format": "prisma format",
+    "prisma:seed": "tsx prisma/seed.ts"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   },
   "keywords": [],
   "author": "",
