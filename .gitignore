@@ -36,3 +36,12 @@ coverage/
 # Temporary files
 tmp/
 temp/
+
+# Docker/podman-compose local repo workspace mount (see docker-compose.yaml)
+/workspace/*
+!/workspace/.gitkeep
+
+# Docker/podman-compose custom env overrides — .env.docker itself (no
+# secrets, ollama-based) is the checked-in default and must NOT be ignored.
+.env.docker.*
+!.env.docker.example
