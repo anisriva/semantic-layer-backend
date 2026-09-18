@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import { ConversationController } from '@/controllers/conversation.controller.js';
+import { AuditController } from '@/controllers/audit.controller.js';
 
 const router = Router();
 const conversationController = new ConversationController();
+const auditController = new AuditController();
 
 // POST /api/v1/conversations - Create a new conversation
 router.post('/', conversationController.createConversation.bind(conversationController));
@@ -15,5 +17,8 @@ router.get('/:id/messages', conversationController.listMessages.bind(conversatio
 
 // POST /api/v1/conversations/:id/messages (SSE) - Ask a question, streaming the answer
 router.post('/:id/messages', conversationController.streamMessage.bind(conversationController));
+
+// GET /api/v1/conversations/:id/audit - Get audit logs for a conversation
+router.get('/:id/audit', auditController.getConversationAuditLogs.bind(auditController));
 
 export { router as conversationRoutes };

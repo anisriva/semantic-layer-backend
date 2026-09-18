@@ -3,7 +3,7 @@ import healthRoutes from '@/routes/health.routes.js';
 import { repositoryRoutes } from '@/routes/repository.routes.js';
 import { jobRoutes } from '@/routes/job.routes.js';
 import { conversationRoutes } from '@/routes/conversation.routes.js';
-import { auditRoutes } from '@/routes/audit.routes.js';
+// import { auditRoutes } from '@/routes/audit.routes.js';
 
 export const apiRouter = Router();
 
@@ -19,5 +19,5 @@ apiRouter.use('/jobs', jobRoutes);
 // Mount conversation routes
 apiRouter.use('/conversations', conversationRoutes);
 
-// Mount audit routes
-apiRouter.use('/audit', auditRoutes);
+// WIP
+// apiRouter.use('/audit', auditRoutes);

@@ -1,15 +1,13 @@
-import { Router } from 'express';
-import { AuditController } from '@/controllers/audit.controller.js';
+/*
+THIS IS A WIP Router implement the audit related analytics
+in these routes, which can be a system wide audit and not contrained 
+to a job or a converstation.
+*/
 
-const router = Router();
-const auditController = new AuditController();
+// import { Router } from "express";
+// import { AuditController } from "@/controllers/audit.controller.js";
 
-// Job audit routes
-// GET /api/v1/audit/:id/jobs - Get audit logs for a job
-router.get('/audit/:id/jobs', auditController.getJobAuditLogs.bind(auditController));
+// const router = Router();
+// const auditController = new AuditController();
 
-// Conversation audit routes
-// GET /api/v1/audit/:id/conversations - Get audit logs for a conversation
-router.get('/audit/:id/conversations', auditController.getConversationAuditLogs.bind(auditController));
-
-export { router as auditRoutes };
+// export { router as auditRoutes };
