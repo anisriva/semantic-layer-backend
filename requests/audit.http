@@ -28,6 +28,14 @@ GET http://localhost:3000/api/v1/audit/{{job_id}}/jobs?metricsType=PERFORMANCE
 ### Get audit logs for a job with all filters
 GET http://localhost:3000/api/v1/audit/{{job_id}}/jobs?stage=PROCESS_FILES&metricsType=PERFORMANCE&limit=100&offset=0
 
+### Stream audit logs for a job (SSE)
+### Streams audit log entries for job-related stages as they are created
+### Behavior:
+### - Replays every audit log recorded so far as `event: audit` frames
+### - If job is already completed/failed, sends `event: done` and closes immediately
+### - Otherwise polls for new audit logs at configured intervals until job reaches terminal state
+GET http://localhost:3000/api/v1/jobs/{{job_id}}/audit/stream
+
 #############################################
 # Conversation Audit Operations
 #############################################

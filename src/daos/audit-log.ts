@@ -600,4 +600,27 @@ export class AuditLogDao {
       orderBy: { started_at: 'desc' },
     });
   }
+
+  /**
+   * Finds audit logs for a job created after a given cursor (audit log ID),
+   * oldest first — used to tail new audit logs during SSE streaming.
+   */
+  async findByJobSince(jobId: string, afterId?: string): Promise<AuditLog[]> {
+    if (!afterId) {
+      return this.findByJob(jobId);
+    }
+
+    const cursor = await prisma.auditLog.findUnique({ where: { id: afterId } });
+    if (!cursor) {
+      return this.findByJob(jobId);
+    }
+
+    return prisma.auditLog.findMany({
+      where: {
+        job_id: jobId,
+        started_at: { gt: cursor.started_at },
+      },
+      orderBy: { started_at: 'asc' },
+    });
+  }
 }

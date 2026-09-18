@@ -1,6 +1,6 @@
 import { AuditLogDao } from '@/daos/index.js';
 import type { AuditLogWithMetrics } from '@/daos/audit-log.js';
-import { PipelineStage, MetricsType } from '@/types/audit.js';
+import { PipelineStage, MetricsType, type AuditLog } from '@/types/audit.js';
 
 export interface AuditLogQueryOptions {
   stage?: PipelineStage;
@@ -50,5 +50,13 @@ export class AuditService {
       limit: options?.limit,
       offset: options?.offset,
     });
+  }
+
+  /**
+   * Gets audit logs for a job created after a given cursor (audit log ID),
+   * oldest first — used to tail new audit logs during SSE streaming.
+   */
+  async getJobAuditLogsSince(jobId: string, afterId?: string): Promise<AuditLog[]> {
+    return this.auditLogDao.findByJobSince(jobId, afterId);
   }
 }
