@@ -1,62 +1,100 @@
-import { Request, Response, NextFunction } from 'express';
-import { JobQueueService } from '@/services/job-queue.js';
+import { Request, Response, NextFunction } from "express";
+import { JobQueueService } from "@/services/job-queue.js";
+import type {
+  ApiResponse,
+  ApiPaginatedResponse,
+} from "@/types/common/index.js";
+import type { Job } from "@prisma/client";
+import { ZodError } from "zod";
+import { listRepositoryJobsQuerySchema } from "@/schemas/job/index.js";
 
 export class JobController {
-  constructor(private readonly jobQueueService: JobQueueService = new JobQueueService()) {}
+  constructor(
+    private readonly jobQueueService: JobQueueService = new JobQueueService(),
+  ) {}
 
   /**
    * GET /api/v1/jobs/:id
    * Gets a specific job.
    */
-  async getJob(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getJob(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<Response<ApiResponse<Job>>> {
     try {
       const { id } = req.params;
       if (!id) {
-        res.status(400).json({ error: 'Job ID is required' });
-        return;
+        return res
+          .status(400)
+          .json({ success: false, error: "Job ID is required" });
       }
-      const jobId: string = Array.isArray(id) ? (id[0] ?? '') : id;
+      const jobId: string = id as string;
       const job = await this.jobQueueService.getJob(jobId);
 
       if (!job) {
-        res.status(404).json({
-          error: 'Job not found',
+        return res.status(404).json({
+          success: false,
+          error: "Job not found",
         });
-        return;
       }
 
-      res.json(job);
+      return res.json({ success: true, data: job });
     } catch (error) {
       next(error);
+      return res
+        .status(500)
+        .json({ success: false, error: "Internal server error" });
     }
   }
-
-
 
   /**
    * GET /api/v1/repositories/:id/jobs
    * Lists jobs for a repository.
    */
-  async listRepositoryJobs(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async listRepositoryJobs(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<Response<ApiPaginatedResponse<Job>>> {
     try {
       const { id } = req.params;
       if (!id) {
-        res.status(400).json({ error: 'Repository ID is required' });
-        return;
+        return res
+          .status(400)
+          .json({ success: false, error: "Repository ID is required" });
       }
-      const repositoryId: string = Array.isArray(id) ? (id[0] ?? '') : id;
-      const { status, type, limit, offset } = req.query;
+      const repositoryId: string = id as string;
+      const validatedQuery = listRepositoryJobsQuerySchema.parse(req.query);
 
       const jobs = await this.jobQueueService.listJobs(repositoryId, {
-        status: status as 'pending' | 'processing' | 'completed' | 'failed' | undefined,
-        type: type as 'INDEX' | 'REFRESH' | undefined,
-        limit: limit ? parseInt(String(limit)) : undefined,
-        offset: offset ? parseInt(String(offset)) : undefined,
+        status: validatedQuery.status,
+        type: validatedQuery.type,
+        limit: validatedQuery.limit,
+        offset: validatedQuery.offset,
       });
 
-      res.json(jobs);
+      return res.json({
+        success: true,
+        data: jobs,
+        meta: {
+          total: jobs.length,
+          limit: validatedQuery.limit ?? jobs.length,
+          offset: validatedQuery.offset ?? 0,
+        },
+      });
     } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({
+          success: false,
+          error: "Validation error",
+          details: error.issues,
+        });
+      }
       next(error);
+      return res
+        .status(500)
+        .json({ success: false, error: "Internal server error" });
     }
   }
 
@@ -78,25 +116,29 @@ export class JobController {
    *    frames as they appear, until the job reaches a terminal state
    *    (then sends `event: done` and closes) or the client disconnects.
    */
-  async streamJobLogs(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async streamJobLogs(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     try {
       const { id: rawId } = req.params;
       if (!rawId) {
-        res.status(400).json({ error: 'Job ID is required' });
+        res.status(400).json({ error: "Job ID is required" });
         return;
       }
-      const jobId: string = Array.isArray(rawId) ? (rawId[0] ?? '') : rawId;
+      const jobId: string = rawId as string;
 
       const job = await this.jobQueueService.getJob(jobId);
       if (!job) {
-        res.status(404).json({ error: 'Job not found' });
+        res.status(404).json({ error: "Job not found" });
         return;
       }
 
       res.writeHead(200, {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        Connection: 'keep-alive',
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
       });
 
       let lastLogId: string | undefined;
@@ -115,7 +157,7 @@ export class JobController {
 
       await sendLogs();
 
-      const TERMINAL_STATUSES = new Set(['completed', 'failed']);
+      const TERMINAL_STATUSES = new Set(["completed", "failed"]);
       if (TERMINAL_STATUSES.has(job.status)) {
         sendDone(job.status);
         return;
@@ -129,7 +171,7 @@ export class JobController {
           const current = await this.jobQueueService.getJob(jobId);
           if (!current || TERMINAL_STATUSES.has(current.status)) {
             clearInterval(interval);
-            sendDone(current?.status ?? 'unknown');
+            sendDone(current?.status ?? "unknown");
           }
         } catch (error) {
           clearInterval(interval);
@@ -137,7 +179,7 @@ export class JobController {
         }
       }, pollIntervalMs);
 
-      req.on('close', () => {
+      req.on("close", () => {
         clearInterval(interval);
       });
     } catch (error) {

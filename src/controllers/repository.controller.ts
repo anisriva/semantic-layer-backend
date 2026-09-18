@@ -1,8 +1,19 @@
 import { Request, Response, NextFunction } from "express";
 import {
   RepositoryService,
-  CreateRepositoryData,
+  RepositoryWithDetails,
 } from "@/services/repository.js";
+import type {
+  ApiResponse,
+  ApiPaginatedResponse,
+} from "@/types/common/index.js";
+import { ZodError } from "zod";
+import {
+  createRepositorySchema,
+  listRepositoriesQuerySchema,
+  updateRepositorySchema,
+  refreshRepositorySchema,
+} from "@/schemas/repository/index.js";
 
 export class RepositoryController {
   constructor(
@@ -22,36 +33,24 @@ export class RepositoryController {
     req: Request,
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<Response<ApiResponse<RepositoryWithDetails>>> {
     try {
-      const { sourceType, gitUrl, localPath, name, description } = req.body;
-
-      if (!name) {
-        res.status(400).json({
-          error: "name is required",
-        });
-        return;
-      }
-
-      if ((sourceType ?? "LOCAL") === "LOCAL" && !localPath) {
-        res.status(400).json({
-          error: "localPath is required when sourceType is LOCAL",
-        });
-        return;
-      }
-
-      const data: CreateRepositoryData = {
-        sourceType,
-        gitUrl,
-        localPath,
-        name,
-        description,
-      };
-
-      const repository = await this.repositoryService.createRepository(data);
-      res.status(201).json(repository);
+      const validatedData = createRepositorySchema.parse(req.body);
+      const repository =
+        await this.repositoryService.createRepository(validatedData);
+      return res.status(201).json({ success: true, data: repository });
     } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({
+          success: false,
+          error: "Validation error",
+          details: error.issues,
+        });
+      }
       next(error);
+      return res
+        .status(500)
+        .json({ success: false, error: "Internal server error" });
     }
   }
 
@@ -63,19 +62,33 @@ export class RepositoryController {
     req: Request,
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<Response<ApiPaginatedResponse<RepositoryWithDetails>>> {
     try {
-      const { status, limit, offset } = req.query;
+      const validatedQuery = listRepositoriesQuerySchema.parse(req.query);
+      const repositories =
+        await this.repositoryService.listRepositories(validatedQuery);
 
-      const repositories = await this.repositoryService.listRepositories({
-        status: status as any,
-        limit: limit ? parseInt(String(limit)) : undefined,
-        offset: offset ? parseInt(String(offset)) : undefined,
+      return res.json({
+        success: true,
+        data: repositories,
+        meta: {
+          total: repositories.length,
+          limit: validatedQuery.limit ?? repositories.length,
+          offset: validatedQuery.offset ?? 0,
+        },
       });
-
-      res.json(repositories);
     } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({
+          success: false,
+          error: "Validation error",
+          details: error.issues,
+        });
+      }
       next(error);
+      return res
+        .status(500)
+        .json({ success: false, error: "Internal server error" });
     }
   }
 
@@ -87,27 +100,31 @@ export class RepositoryController {
     req: Request,
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<Response<ApiResponse<RepositoryWithDetails>>> {
     try {
       const { id } = req.params;
       if (!id) {
-        res.status(400).json({ error: "Repository ID is required" });
-        return;
+        return res
+          .status(400)
+          .json({ success: false, error: "Repository ID is required" });
       }
-      const repositoryId: string = Array.isArray(id) ? (id[0] ?? "") : id;
+      const repositoryId: string = id as string;
       const repository =
         await this.repositoryService.getRepository(repositoryId);
 
       if (!repository) {
-        res.status(404).json({
+        return res.status(404).json({
+          success: false,
           error: "Repository not found",
         });
-        return;
       }
 
-      res.json(repository);
+      return res.json({ success: true, data: repository });
     } catch (error) {
       next(error);
+      return res
+        .status(500)
+        .json({ success: false, error: "Internal server error" });
     }
   }
 
@@ -119,27 +136,35 @@ export class RepositoryController {
     req: Request,
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<Response<ApiResponse<RepositoryWithDetails>>> {
     try {
       const { id } = req.params;
       if (!id) {
-        res.status(400).json({ error: "Repository ID is required" });
-        return;
+        return res
+          .status(400)
+          .json({ success: false, error: "Repository ID is required" });
       }
-      const repositoryId: string = Array.isArray(id) ? (id[0] ?? "") : id;
-      const { name, description } = req.body;
+      const repositoryId: string = id as string;
+      const validatedData = updateRepositorySchema.parse(req.body);
 
       const repository = await this.repositoryService.updateRepository(
         repositoryId,
-        {
-          name,
-          description,
-        },
+        validatedData,
       );
 
-      res.json(repository);
+      return res.json({ success: true, data: repository });
     } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({
+          success: false,
+          error: "Validation error",
+          details: error.issues,
+        });
+      }
       next(error);
+      return res
+        .status(500)
+        .json({ success: false, error: "Internal server error" });
     }
   }
 
@@ -151,20 +176,24 @@ export class RepositoryController {
     req: Request,
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<Response<ApiResponse<RepositoryWithDetails>>> {
     try {
       const { id } = req.params;
       if (!id) {
-        res.status(400).json({ error: "Repository ID is required" });
-        return;
+        return res
+          .status(400)
+          .json({ success: false, error: "Repository ID is required" });
       }
-      const repositoryId: string = Array.isArray(id) ? (id[0] ?? "") : id;
+      const repositoryId: string = id as string;
       const repository =
         await this.repositoryService.deleteRepository(repositoryId);
 
-      res.json(repository);
+      return res.json({ success: true, data: repository });
     } catch (error) {
       next(error);
+      return res
+        .status(500)
+        .json({ success: false, error: "Internal server error" });
     }
   }
 
@@ -180,23 +209,34 @@ export class RepositoryController {
     req: Request,
     res: Response,
     next: NextFunction,
-  ): Promise<void> {
+  ): Promise<Response<ApiResponse<RepositoryWithDetails>>> {
     try {
       const { id } = req.params;
       if (!id) {
-        res.status(400).json({ error: "Repository ID is required" });
-        return;
+        return res
+          .status(400)
+          .json({ success: false, error: "Repository ID is required" });
       }
-      const repositoryId: string = Array.isArray(id) ? (id[0] ?? "") : id;
-      const { commitHead } = req.body ?? {};
+      const repositoryId: string = id as string;
+      const validatedData = refreshRepositorySchema.parse(req.body ?? {});
 
       const repository = await this.repositoryService.refreshRepository(
         repositoryId,
-        commitHead,
+        validatedData.commitHead,
       );
-      res.json(repository);
+      return res.json({ success: true, data: repository });
     } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({
+          success: false,
+          error: "Validation error",
+          details: error.issues,
+        });
+      }
       next(error);
+      return res
+        .status(500)
+        .json({ success: false, error: "Internal server error" });
     }
   }
 }
