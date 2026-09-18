@@ -75,7 +75,7 @@ Content-Type: application/json
 }
 
 ### Step 2: Ask a question (SSE) using the conversation ID from Step 1
-POST http://localhost:3000/api/v1/conversations/{{createConversation.response.body.$.id}}/messages
+POST http://localhost:3000/api/v1/conversations/{{createConversation.response.body.$.data.id}}/messages
 Content-Type: application/json
 Accept: text/event-stream
 
@@ -84,4 +84,4 @@ Accept: text/event-stream
 }
 
 ### Step 3: Read back the full message history
-GET http://localhost:3000/api/v1/conversations/{{createConversation.response.body.$.id}}/messages
+GET http://localhost:3000/api/v1/conversations/{{createConversation.response.body.$.data.id}}/messages

@@ -128,19 +128,19 @@ Content-Type: application/json
 
 ### Step 2: Get the created repository ID from response
 # @name getRepoId
-GET http://localhost:3000/api/v1/repositories/{{createRepo.response.body.$.id}}
+GET http://localhost:3000/api/v1/repositories/{{createRepo.response.body.$.data.id}}
 
 ### Step 3: Trigger a refresh (full re-scan; delta detection arrives with Git Integration)
-POST http://localhost:3000/api/v1/repositories/{{createRepo.response.body.$.id}}/refresh
+POST http://localhost:3000/api/v1/repositories/{{createRepo.response.body.$.data.id}}/refresh
 Content-Type: application/json
 
 {}
 
 ### Step 4: Check repository status
-GET http://localhost:3000/api/v1/repositories/{{createRepo.response.body.$.id}}
+GET http://localhost:3000/api/v1/repositories/{{createRepo.response.body.$.data.id}}
 
 ### Step 5: List jobs for the repository
-GET http://localhost:3000/api/v1/repositories/{{createRepo.response.body.$.id}}/jobs
+GET http://localhost:3000/api/v1/repositories/{{createRepo.response.body.$.data.id}}/jobs
 
 ### Step 6: Get job details and audit logs
 # Replace {{job_id}} with an actual job ID from the previous response

@@ -14,19 +14,19 @@
 #############################################
 
 ### Get all audit logs for a job
-GET http://localhost:3000/api/v1/audit/{{job_id}}/jobs
+GET http://localhost:3000/api/v1/jobs/{{job_id}}/audit
 
 ### Get audit logs for a job with pagination
-GET http://localhost:3000/api/v1/audit/{{job_id}}/jobs?limit=50&offset=0
+GET http://localhost:3000/api/v1/jobs/{{job_id}}/audit?limit=50&offset=0
 
 ### Get audit logs for a job filtered by stage
-GET http://localhost:3000/api/v1/audit/{{job_id}}/jobs?stage=SCAN
+GET http://localhost:3000/api/v1/jobs/{{job_id}}/audit?stage=SCAN
 
 ### Get audit logs for a job filtered by metrics type
-GET http://localhost:3000/api/v1/audit/{{job_id}}/jobs?metricsType=PERFORMANCE
+GET http://localhost:3000/api/v1/jobs/{{job_id}}/audit?metricsType=PERFORMANCE
 
 ### Get audit logs for a job with all filters
-GET http://localhost:3000/api/v1/audit/{{job_id}}/jobs?stage=PROCESS_FILES&metricsType=PERFORMANCE&limit=100&offset=0
+GET http://localhost:3000/api/v1/jobs/{{job_id}}/audit?stage=PROCESS_FILES&metricsType=PERFORMANCE&limit=100&offset=0
 
 ### Stream audit logs for a job (SSE)
 ### Streams audit log entries for job-related stages as they are created
@@ -41,19 +41,19 @@ GET http://localhost:3000/api/v1/jobs/{{job_id}}/audit/stream
 #############################################
 
 ### Get all audit logs for a conversation
-GET http://localhost:3000/api/v1/audit/{{conversation_id}}/conversations
+GET http://localhost:3000/api/v1/conversations/{{conversation_id}}/audit
 
 ### Get audit logs for a conversation with pagination
-GET http://localhost:3000/api/v1/audit/{{conversation_id}}/conversations?limit=50&offset=0
+GET http://localhost:3000/api/v1/conversations/{{conversation_id}}/audit?limit=50&offset=0
 
 ### Get audit logs for a conversation filtered by stage
-GET http://localhost:3000/api/v1/audit/{{conversation_id}}/conversations?stage=RETRIEVAL
+GET http://localhost:3000/api/v1/conversations/{{conversation_id}}/audit?stage=RETRIEVAL
 
 ### Get audit logs for a conversation filtered by metrics type
-GET http://localhost:3000/api/v1/audit/{{conversation_id}}/conversations?metricsType=COST
+GET http://localhost:3000/api/v1/conversations/{{conversation_id}}/audit?metricsType=COST
 
 ### Get audit logs for a conversation with all filters
-GET http://localhost:3000/api/v1/audit/{{conversation_id}}/conversations?stage=CHAT_COMPLETION&metricsType=COST&limit=100&offset=0
+GET http://localhost:3000/api/v1/conversations/{{conversation_id}}/audit?stage=CHAT_COMPLETION&metricsType=COST&limit=100&offset=0
 
 #############################################
 # Query Parameters Reference
@@ -67,13 +67,13 @@ GET http://localhost:3000/api/v1/audit/{{conversation_id}}/conversations?stage=C
 
 ### Example: Paginate through large audit logs
 # First page (first 50 records)
-GET http://localhost:3000/api/v1/audit/{{job_id}}/jobs?limit=50&offset=0
+GET http://localhost:3000/api/v1/jobs/{{job_id}}/audit?limit=50&offset=0
 
 # Second page (next 50 records)
-GET http://localhost:3000/api/v1/audit/{{job_id}}/jobs?limit=50&offset=50
+GET http://localhost:3000/api/v1/jobs/{{job_id}}/audit?limit=50&offset=50
 
 # Third page (next 50 records)
-GET http://localhost:3000/api/v1/audit/{{job_id}}/jobs?limit=50&offset=100
+GET http://localhost:3000/api/v1/jobs/{{job_id}}/audit?limit=50&offset=100
 
 #############################################
 # Common Pipeline Stages
@@ -106,10 +106,10 @@ GET http://localhost:3000/api/v1/audit/{{job_id}}/jobs?limit=50&offset=100
 # - BUSINESS: Business metrics (user engagement, outcomes)
 
 ### Example: Get only performance metrics for a job
-GET http://localhost:3000/api/v1/audit/{{job_id}}/jobs?metricsType=PERFORMANCE
+GET http://localhost:3000/api/v1/jobs/{{job_id}}/audit?metricsType=PERFORMANCE
 
 ### Example: Get only cost metrics for a conversation
-GET http://localhost:3000/api/v1/audit/{{conversation_id}}/conversations?metricsType=COST
+GET http://localhost:3000/api/v1/conversations/{{conversation_id}}/audit?metricsType=COST
 
 #############################################
 # Response Format
